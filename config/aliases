@@ -27,6 +27,7 @@ alias k='cursor'
 alias K='cursor .'
 alias p='python'
 alias cdtmp='pushd $(mktemp -d)'
+alias ff='f(){ find . -iname "*$1*" 2>/dev/null; unset -f f; }; f'
 
 # Git stuff
 alias git-clone-all-github='curl -sk -H "Authorization: token ${GITHUB_READ_TOKEN}" "https://api.github.com/search/repositories?q=user:$GITHUB_USER" | jq -r ".items[].ssh_url" | parallel -j10 "git clone {}"'
@@ -96,6 +97,8 @@ alias mcrypt-enc='f(){ PASS=$(cat /dev/urandom | base64 | head -c 20) && echo "$
 alias mcrypt-dec='mdecrypt'
 alias get-meteo='curl https://wttr.in/'
 alias fab='fabric-ai -s'
+alias color='export GREP_COLORS="mt=30;46"'
+alias urld="perl -MURI::Escape -ne 'print uri_unescape(\$_);'"
 
 # Python
 alias pv='f(){ if [ -z "$1" ] ; then echo "Use: pv 3.12" ; else mise use "python@$1" ; mise config set env._.python.venv.path .venv ; mise config set --type bool env._.python.venv.create true ; mise exec -- which python ; mise exec -- python --version ; fi;  unset -f f; }; f'
@@ -146,6 +149,7 @@ alias dwipe-image='docker rmi -f $(docker images -q)'
 alias dwipe-network='docker network rm $(docker network ls -q | tr "\n" " ")'
 alias dwipe-process='docker rm $(docker ps -a -q)'
 alias dwipe-volume='docker volume rm $(docker volume ls -q | tr "\n" " ")'
+alias di='docker inspect $(docker ps | grep -vF "NAMES" | fzf | cut -d" " -f1)'
 
 # Docker Tooling
 ## Git stuff
@@ -162,6 +166,8 @@ alias dsecator="dockit -v ~/.secator:/root/.secator freelabz/secator" # normaliz
 alias drustscan='dockit rustscan/rustscan' # web path enum
 alias doneforall='dockit -w /OneForAll -v /tmp/results:/OneForAll/results shmilylty/oneforall' # noisy recon
 alias dgetfuzz='echo "AA<fuzz1>\"fuzz2'"'"'fuzz3\`%}})fuzz4\${{fuzz5\\"BB'
+alias getcan='f(){ echo "skanary$(date +%s%3N)"; unset -f f; }; f'
+alias geti='f(){ raw="${1#skanary}"; [[ "$raw" =~ ^[0-9]+$ ]] && seconds=$((raw / 1000)) && millis=$((raw % 1000)) && date -d "@$seconds" "+%Y-%m-%d %H:%M:%S.${millis}" || echo "Format invalide : $raw n'\''est pas numérique"; unset -f f; }; f'
 
 ## Compliance
 alias dssh-audit="dockit positronsecurity/ssh-audit"
