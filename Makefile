@@ -106,21 +106,10 @@ install-cli-tools: sanity-check ## Install CLI tools & runtimes
 	$(call ska-link,/opt/skillarch/config/nvim/init.lua,$$HOME/.config/nvim/init.lua)
 	nvim --headless +"Lazy! sync" +qa >/dev/null # Download and update plugins
 
-	# Install pipx & tools
-	yay --noconfirm --needed -S python-pipx
-	pipx ensurepath
-	for package in argcomplete bypass-url-parser dirsearch exegol pre-commit sqlmap wafw00f yt-dlp semgrep defaultcreds-cheat-sheet; do
-		pipx install -q "$$package" && pipx inject -q "$$package" setuptools || {
-			echo -e "$(C_WARN) Retrying $$package install...$(C_RST)"
-			pipx uninstall "$$package" || true
-			pipx install -q "$$package" && pipx inject -q "$$package" setuptools
-		}
-	done
-
 	# Install mise and all php-build dependencies
 	$(PACMAN_INSTALL) mise libedit libffi libjpeg-turbo libpcap libpng libxml2 libzip postgresql-libs php-gd
 	# mise self-update # Currently broken, wait for upstream fix, pinged on 17/03/2025
-	for package in usage pdm rust terraform golang python nodejs uv; do \
+	for package in uv usage pdm rust terraform golang python nodejs; do \
 		for attempt in 1 2 3; do \
 			mise use -g "$$package@latest" && break || { \
 				echo -e "$(C_WARN) mise install $$package failed (attempt $$attempt/3), retrying in 5s...$(C_RST)" ; \
@@ -129,6 +118,16 @@ install-cli-tools: sanity-check ## Install CLI tools & runtimes
 		done ; \
 	done
 	mise exec -- go env -w "GOPATH=/home/$$USER/.local/go"
+	eval "$$(mise activate bash)" || true
+
+	# Install uv tools
+	for package in argcomplete bypass-url-parser dirsearch exegol pre-commit sqlmap wafw00f yt-dlp semgrep defaultcreds-cheat-sheet; do
+		uv tool install -w setuptools "$$package" || {
+			echo -e "$(C_WARN) Retrying $$package install...$(C_RST)"
+			uv tool uninstall "$$package" || true
+			uv tool install -q -w setuptools "$$package"
+		}
+	done
 	echo -e "$(C_OK) CLI tools & runtimes installed!$(C_RST)"
 
 install-shell: sanity-check ## Install shell, zsh, oh-my-zsh, fzf, tmux
@@ -319,7 +318,7 @@ test: ## Validate installation (smoke tests)
 	echo -e "\n$(C_BOLD)--- Offensive Tools ---$(C_RST)"
 	ska_check "nmap"       "which nmap"
 	ska_check "ffuf"       "which ffuf"
-	ska_check "sqlmap"     "which sqlmap || pipx list 2>/dev/null | grep -q sqlmap"
+	ska_check "sqlmap"     "which sqlmap || [ -f ~/.local/bin/sqlmap ]"
 	ska_check "nuclei"     "which nuclei || [ -f ~/.pdtm/go/bin/nuclei ]"
 	ska_check "httpx"      "which httpx || [ -f ~/.pdtm/go/bin/httpx ]"
 	ska_check "subfinder"  "which subfinder || [ -f ~/.pdtm/go/bin/subfinder ]"
@@ -519,8 +518,9 @@ list-tools: ## List installed offensive tools & versions
 	ska_ver "burpsuite"  "echo 'installed (GUI)'"
 	ska_ver "ghidra"     "echo 'installed (GUI)'"
 	ska_ver "wireshark"  "wireshark --version 2>&1 | head -1"
-	echo -e "\n$(C_BOLD)--- Pipx Tools ---$(C_RST)"
-	pipx list --short 2>/dev/null || echo "  pipx not available"
+	echo -e "\n$(C_BOLD)--- Uv Tools ---$(C_RST)"
+	eval "$$(mise activate bash)" || true
+	uv tool list 2>/dev/null | grep -v '-' | pr -o2 -t || echo "  uv not available"
 	echo -e "\n$(C_BOLD)--- Pdtm Tools ---$(C_RST)"
 	ls ~/.pdtm/go/bin/ 2>/dev/null | while read -r tool; do echo "  $$tool"; done || echo "  pdtm not installed"
 	echo ""
