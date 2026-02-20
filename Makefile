@@ -4,22 +4,27 @@ SHELL := /bin/bash
 .PHONY: help install sanity-check install-base install-cli-tools install-shell install-docker install-gui install-gui-tools install-offensive install-wordlists install-hardening update docker-build docker-build-full docker-run docker-run-full clean test test-lite test-full doctor list-tools backup
 
 # -- Colors & UX Helpers --
-C_RST  := \033[0m
-C_OK   := \033[1;32m
-C_INFO := \033[1;34m
-C_WARN := \033[1;33m
-C_ERR  := \033[1;31m
-C_BOLD := \033[1m
-SKA_LOG := /var/tmp/skillarch-install.log
+C_RST   := \033[0m
+C_OK    := \033[1;32m
+C_INFO  := \033[1;34m
+C_WARN  := \033[1;33m
+C_ERR   := \033[1;31m
+C_BOLD  := \033[1m
+SKA_LOG := /var/tmp/skillarch-install_$$(date +%Y%m%d_%H%M%S).log
+comma   := ,  ## Use the variable $(comma) instead of ',' to prevent it from being used as a parameter separator.
+
+BOLD = @echo -e "$(C_BOLD)$(1)$(C_RST)"
+OK	 = @echo -e "$(C_OK)✔  $(1)$(C_RST)"
+INFO = @echo -e "$(C_INFO)→  $(1)$(C_RST)"
+WARN = @echo -e "$(C_WARN)⚠  $(1)$(C_RST)"
+ERR	 = @echo -e "$(C_ERR)✖  $(1)$(C_RST)" >&2
+STEP = @echo -e "$(C_BOLD)$(C_INFO)==>  [$(1)/$(2)]$(C_RST) $(C_INFO)$(3)...$(C_RST)"
+DONE = @echo -e "\n$(C_OK)✓ Done - $(1)$(C_RST)\n"
 
 define ska-link
 	# Backup existing file (if not already a symlink) and create symlink
-	[ -f $(2) ] && [ ! -L $(2) ] && mv $(2) $(2).skabak || true
+	[[ -f $(2) && ! -L $(2) ]] && mv $(2) $(2).skabak || true
 	ln -sf $(1) $(2)
-endef
-
-define ska-step
-	echo -e "$(C_INFO)$(C_BOLD)[$(1)/$(2)]$(C_RST) $(C_INFO)$(3)...$(C_RST)"
 endef
 
 PACMAN_INSTALL := sudo pacman -S --noconfirm --needed
@@ -35,42 +40,45 @@ help: ## Show this help message
 install: ## Install SkillArch (full)
 	echo "" > $(SKA_LOG)
 	exec > >(tee -a $(SKA_LOG)) 2>&1
-	$(call ska-step,1,9,Installing base packages)
+	curStep=1
+	numSteps=9
+	$(call STEP,$$((curStep++)),$$numSteps,Installing base packages)
 	$(MAKE) install-base
-	$(call ska-step,2,9,Installing CLI tools & runtimes)
+	$(call STEP,$$((curStep++)),$$numSteps,Installing CLI tools & runtimes)
 	$(MAKE) install-cli-tools
-	$(call ska-step,3,9,Installing shell & dotfiles)
+	$(call STEP,$$((curStep++)),$$numSteps,Installing shell & dotfiles)
 	$(MAKE) install-shell
-	$(call ska-step,4,9,Installing Docker)
+	$(call STEP,$$((curStep++)),$$numSteps,Installing Docker)
 	$(MAKE) install-docker
-	$(call ska-step,5,9,Installing GUI & WM)
+	$(call STEP,$$((curStep++)),$$numSteps,Installing GUI & WM)
 	$(MAKE) install-gui
-	$(call ska-step,6,9,Installing GUI applications)
+	$(call STEP,$$((curStep++)),$$numSteps,Installing GUI applications)
 	$(MAKE) install-gui-tools
-	$(call ska-step,7,9,Installing offensive tools)
+	$(call STEP,$$((curStep++)),$$numSteps,Installing offensive tools)
 	$(MAKE) install-offensive
-	$(call ska-step,8,9,Installing wordlists)
+	$(call STEP,$$((curStep++)),$$numSteps,Installing wordlists)
 	$(MAKE) install-wordlists
-	$(call ska-step,9,9,Installing hardening tools)
+	$(call STEP,$$((curStep++)),$$numSteps,Installing hardening tools)
 	$(MAKE) install-hardening
+	
 	$(MAKE) clean
 	$(MAKE) test
-	echo -e "$(C_OK) You are all set up! Enjoy SkillArch! <3$(C_RST)"
-	echo -e "$(C_INFO) Install log saved to $(SKA_LOG)$(C_RST)"
+	$(call DONE,You are all set up! Enjoy SkillArch! <3)
+	$(call INFO,Install log saved to $(SKA_LOG))
 
 sanity-check:
 	set -x
 	# Ensure we are in /opt/skillarch or /opt/skillarch-original (maintainer only)
-	[ "$$(pwd)" != "/opt/skillarch" ] && [ "$$(pwd)" != "/opt/skillarch-original" ] && echo "You must be in /opt/skillarch or /opt/skillarch-original to run this command" && exit 1 || true
-	sudo -v || (echo "Error: sudo access is required" ; exit 1)
-	[ ! -f /.dockerenv ] && { systemd-inhibit --what sleep:idle sleep 3600 & } || true
+	[[ "$$(pwd)" != "/opt/skillarch" ]] && [[ "$$(pwd)" != "/opt/skillarch-original" ]] && $(call ERR,You must be in /opt/skillarch or /opt/skillarch-original to run this command) && exit 1 || true
+	sudo -v || ($(call ERR,Error: sudo access is required) ; exit 1)
+	[[ ! -f /.dockerenv ]] && { systemd-inhibit --what sleep:idle sleep 3600 & } || true
 
 install-base: sanity-check ## Install base packages
-	echo -e "$(C_INFO) Installing base packages...$(C_RST)"
+	$(call INFO,Installing base packages...)
 	# Clean up, Update, Basics
 	sudo sed -e "s#.*ParallelDownloads.*#ParallelDownloads = 10#g" -i /etc/pacman.conf
 	echo 'BUILDDIR="/dev/shm/makepkg"' | sudo tee /etc/makepkg.conf.d/00-skillarch.conf
-	[ ! -f /.dockerenv ] && sudo cachyos-rate-mirrors || true # Increase install speed & Update repos (skip in Docker)
+	[[ ! -f /.dockerenv ]] && sudo cachyos-rate-mirrors || true # Increase install speed & Update repos (skip in Docker)
 	sudo pacman-key --init
 	sudo pacman-key --populate archlinux cachyos
 	sudo pacman --noconfirm -Scc
@@ -91,129 +99,127 @@ install-base: sanity-check ## Install base packages
 	sudo pacman --noconfirm -Syu
 
 	# Long Lived DATA & trash-cli Setup
-	[ ! -d /DATA ] && sudo mkdir -pv /DATA && sudo chown "$$USER:$$USER" /DATA && sudo chmod 770 /DATA || true
-	[ ! -d /.Trash ] && sudo mkdir -pv /.Trash && sudo chown "$$USER:$$USER" /.Trash && sudo chmod 770 /.Trash && sudo chmod +t /.Trash || true
-	echo -e "$(C_OK) Base packages installed!$(C_RST)"
+	[[ ! -d /DATA ]] && sudo mkdir -pv /DATA && sudo chown "$$USER:$$USER" /DATA && sudo chmod 770 /DATA || true
+	[[ ! -d /.Trash ]] && sudo mkdir -pv /.Trash && sudo chown "$$USER:$$USER" /.Trash && sudo chmod 770 /.Trash && sudo chmod +t /.Trash || true
+	$(call DONE,Base packages installed!)
 
 install-cli-tools: sanity-check ## Install CLI tools & runtimes
-	echo -e "$(C_INFO) Installing CLI tools & runtimes...$(C_RST)"
+	$(call INFO,Installing CLI tools & runtimes...)
 	$(PACMAN_INSTALL) base-devel bison bzip2 ca-certificates cloc cmake dos2unix expect ffmpeg foremost gdb gnupg htop bottom hwinfo icu inotify-tools iproute2 jq llvm lsof ltrace make mlocate mplayer ncurses net-tools ngrep nmap openssh openssl parallel perl-image-exiftool pkgconf python-virtualenv re2c readline ripgrep rlwrap socat sqlite sshpass tmate tor traceroute trash-cli tree unzip vbindiff xclip xz yay zip veracrypt git-delta viu qsv asciinema htmlq neovim glow jless websocat superfile gron eza fastfetch bat sysstat cronie tree-sitter
 	sudo ln -sf /usr/bin/bat /usr/local/bin/batcat
 	bash -c "$$(curl -fsSL https://gef.blah.cat/sh)" || true
-	[ ! -f ~/.gdbinit-gef.py ] && curl -fsSL -o ~/.gdbinit-gef.py https://raw.githubusercontent.com/hugsy/gef/main/gef.py && echo "source ~/.gdbinit-gef.py" >> ~/.gdbinit || echo "gef already installed"
+	[[ ! -f ~/.gdbinit-gef.py ]] && curl -fsSL -o ~/.gdbinit-gef.py https://raw.githubusercontent.com/hugsy/gef/main/gef.py && echo "source ~/.gdbinit-gef.py" >> ~/.gdbinit || echo "gef already installed"
 	# nvim config
-	[ ! -d ~/.config/nvim ] && git clone --depth=1 https://github.com/LazyVim/starter ~/.config/nvim || true
+	[[ ! -d ~/.config/nvim ]] && git clone --depth=1 https://github.com/LazyVim/starter ~/.config/nvim || true
 	$(call ska-link,/opt/skillarch/config/nvim/init.lua,$$HOME/.config/nvim/init.lua)
 	nvim --headless +"Lazy! sync" +qa >/dev/null # Download and update plugins
-
-	# Install pipx & tools
-	yay --noconfirm --needed -S python-pipx
-	pipx ensurepath
-	for package in argcomplete bypass-url-parser dirsearch exegol pre-commit sqlmap wafw00f yt-dlp semgrep defaultcreds-cheat-sheet; do
-		pipx install -q "$$package" && pipx inject -q "$$package" setuptools || {
-			echo -e "$(C_WARN) Retrying $$package install...$(C_RST)"
-			pipx uninstall "$$package" || true
-			pipx install -q "$$package" && pipx inject -q "$$package" setuptools
-		}
-	done
 
 	# Install mise and all php-build dependencies
 	$(PACMAN_INSTALL) mise libedit libffi libjpeg-turbo libpcap libpng libxml2 libzip postgresql-libs php-gd
 	# mise self-update # Currently broken, wait for upstream fix, pinged on 17/03/2025
-	for package in usage pdm rust terraform golang python nodejs uv; do \
+	for package in uv usage pdm rust terraform golang python nodejs; do \
 		for attempt in 1 2 3; do \
 			mise use -g "$$package@latest" && break || { \
-				echo -e "$(C_WARN) mise install $$package failed (attempt $$attempt/3), retrying in 5s...$(C_RST)" ; \
+				$(call WARN,mise install $$package failed (attempt $$attempt/3)$(comma) retrying in 5s...) ; \
 				sleep 5 ; \
 			} ; \
 		done ; \
 	done
 	mise exec -- go env -w "GOPATH=/home/$$USER/.local/go"
-	echo -e "$(C_OK) CLI tools & runtimes installed!$(C_RST)"
+	eval "$$(mise activate bash)" || true
+
+	# Install uv tools
+	for package in argcomplete bypass-url-parser dirsearch exegol pre-commit sqlmap wafw00f yt-dlp semgrep defaultcreds-cheat-sheet; do
+		uv tool install -w setuptools "$$package" || {
+			$(call WARN,Retrying $$package install...)
+			uv tool uninstall "$$package" || true
+			uv tool install -q -w setuptools "$$package"
+		}
+	done
+	$(call DONE,CLI tools & runtimes installed!)
 
 install-shell: sanity-check ## Install shell, zsh, oh-my-zsh, fzf, tmux
-	echo -e "$(C_INFO) Installing shell & dotfiles...$(C_RST)"
+	$(call INFO,Installing shell & dotfiles...)
 	# Install and Configure zsh and oh-my-zsh
 	$(PACMAN_INSTALL) zsh zsh-completions zsh-syntax-highlighting zsh-autosuggestions zsh-history-substring-search zsh-theme-powerlevel10k
-	[ ! -d ~/.oh-my-zsh ] && sh -c "$$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended || true
+	[[ ! -d ~/.oh-my-zsh ]] && sh -c "$$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended || true
 	$(call ska-link,/opt/skillarch/config/zshrc,$$HOME/.zshrc)
-	[ ! -d ~/.oh-my-zsh/plugins/zsh-completions ] && git clone --depth=1 https://github.com/zsh-users/zsh-completions ~/.oh-my-zsh/plugins/zsh-completions || true
-	[ ! -d ~/.oh-my-zsh/plugins/zsh-autosuggestions ] && git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/plugins/zsh-autosuggestions || true
-	[ ! -d ~/.oh-my-zsh/plugins/zsh-syntax-highlighting ] && git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/plugins/zsh-syntax-highlighting || true
-	[ ! -d ~/.ssh ] && mkdir ~/.ssh && chmod 700 ~/.ssh || true # Must exist for ssh-agent to work
+	[[ ! -d ~/.oh-my-zsh/plugins/zsh-completions ]] && git clone --depth=1 https://github.com/zsh-users/zsh-completions ~/.oh-my-zsh/plugins/zsh-completions || true
+	[[ ! -d ~/.oh-my-zsh/plugins/zsh-autosuggestions ]] && git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/plugins/zsh-autosuggestions || true
+	[[ ! -d ~/.oh-my-zsh/plugins/zsh-syntax-highlighting ]] && git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/plugins/zsh-syntax-highlighting || true
+	[[ ! -d ~/.ssh ]] && mkdir ~/.ssh && chmod 700 ~/.ssh || true # Must exist for ssh-agent to work
 	for plugin in colored-man-pages docker extract fzf mise npm terraform tmux zsh-autosuggestions zsh-completions zsh-syntax-highlighting ssh-agent z ; do zsh -c "source ~/.zshrc && omz plugin enable $$plugin || true" || true; done
 
 	# Install and configure fzf, tmux, vim
-	[ ! -d ~/.fzf ] && git clone --depth=1 https://github.com/junegunn/fzf ~/.fzf && ~/.fzf/install --all || true
+	[[ ! -d ~/.fzf ]] && git clone --depth=1 https://github.com/junegunn/fzf ~/.fzf && ~/.fzf/install --all || true
 	$(call ska-link,/opt/skillarch/config/tmux.conf,$$HOME/.tmux.conf)
 	$(call ska-link,/opt/skillarch/config/vimrc,$$HOME/.vimrc)
 	# Set the default user shell to zsh
 	sudo chsh -s /usr/bin/zsh "$$USER" # Logout required to be applied
-	echo -e "$(C_OK) Shell & dotfiles installed!$(C_RST)"
+	$(call DONE,Shell & dotfiles installed!)
 
 install-docker: sanity-check ## Install Docker & Docker Compose
-	echo -e "$(C_INFO) Installing Docker...$(C_RST)"
+	$(call INFO,Installing Docker...)
 	$(PACMAN_INSTALL) docker docker-compose
 	# It's a desktop machine, don't expose stuff, but we don't care much about LPE
 	# Think about it, set "alias sudo='backdoor ; sudo'" in userland and voila. OSEF!
 	sudo usermod -aG docker "$$USER" # Logout required to be applied
 	sleep 1 # Prevent too many docker socket calls and security locks
 	# Do not start services in docker
-	[ ! -f /.dockerenv ] && sudo systemctl enable --now docker || true
-	echo -e "$(C_OK) Docker installed!$(C_RST)"
+	[[ ! -f /.dockerenv ]] && sudo systemctl enable --now docker || true
+	$(call DONE,Docker installed!)
 
 install-gui: sanity-check ## Install i3, polybar, kitty, rofi, picom
-	echo -e "$(C_INFO) Installing GUI & window manager...$(C_RST)"
-	[ ! -f /etc/machine-id ] && sudo systemd-machine-id-setup || true
+	$(call INFO,Installing GUI & window manager...)
+	[[ ! -f /etc/machine-id ]] && sudo systemd-machine-id-setup || true
 	$(PACMAN_INSTALL) xorg-server i3-gaps i3blocks i3lock i3lock-fancy-git i3status dmenu feh rofi nm-connection-editor picom polybar kitty brightnessctl xorg-xhost
 	yay --noconfirm --needed -S rofi-power-menu i3-battery-popup-git
 	gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 
 	# i3 config
-	[ ! -d ~/.config/i3 ] && mkdir -p ~/.config/i3 || true
+	[[ ! -d ~/.config/i3 ]] && mkdir -p ~/.config/i3 || true
 	$(call ska-link,/opt/skillarch/config/i3/config,$$HOME/.config/i3/config)
 
 	# polybar config
-	[ ! -d ~/.config/polybar ] && mkdir -p ~/.config/polybar || true
+	[[ ! -d ~/.config/polybar ]] && mkdir -p ~/.config/polybar || true
 	$(call ska-link,/opt/skillarch/config/polybar/config.ini,$$HOME/.config/polybar/config.ini)
 	$(call ska-link,/opt/skillarch/config/polybar/launch.sh,$$HOME/.config/polybar/launch.sh)
 
 	# rofi config
-	[ ! -d ~/.config/rofi ] && mkdir -p ~/.config/rofi || true
+	[[ ! -d ~/.config/rofi ]] && mkdir -p ~/.config/rofi || true
 	$(call ska-link,/opt/skillarch/config/rofi/config.rasi,$$HOME/.config/rofi/config.rasi)
 
 	# picom config
 	$(call ska-link,/opt/skillarch/config/picom.conf,$$HOME/.config/picom.conf)
 
 	# kitty config
-	[ ! -d ~/.config/kitty ] && mkdir -p ~/.config/kitty || true
+	[[ ! -d ~/.config/kitty ]] && mkdir -p ~/.config/kitty || true
 	$(call ska-link,/opt/skillarch/config/kitty/kitty.conf,$$HOME/.config/kitty/kitty.conf)
 
 	# touchpad config
-	[ ! -d /etc/X11/xorg.conf.d ] && sudo mkdir -p /etc/X11/xorg.conf.d || true
-	[ -f /etc/X11/xorg.conf.d/30-touchpad.conf ] && sudo mv /etc/X11/xorg.conf.d/30-touchpad.conf /etc/X11/xorg.conf.d/30-touchpad.conf.skabak || true
+	[[ ! -d /etc/X11/xorg.conf.d ]] && sudo mkdir -p /etc/X11/xorg.conf.d || true
+	[[ -f /etc/X11/xorg.conf.d/30-touchpad.conf ]] && sudo mv /etc/X11/xorg.conf.d/30-touchpad.conf /etc/X11/xorg.conf.d/30-touchpad.conf.skabak || true
 	sudo ln -sf /opt/skillarch/config/xorg.conf.d/30-touchpad.conf /etc/X11/xorg.conf.d/30-touchpad.conf
-	echo -e "$(C_OK) GUI & window manager installed!$(C_RST)"
+	$(call DONE,GUI & window manager installed!)
 
 install-gui-tools: sanity-check ## Install GUI apps (Chrome, VSCode, Ghidra, etc.)
-	echo -e "$(C_INFO) Installing GUI applications...$(C_RST)"
+	$(call INFO,Installing GUI applications...)
 	# Pre-create flatpak repo dir so post-install hooks don't fail in Docker (flatpak may be pulled as a dependency)
-	[ -f /.dockerenv ] && sudo mkdir -p /var/lib/flatpak/repo || true
+	[[ -f /.dockerenv ]] && sudo mkdir -p /var/lib/flatpak/repo || true
 	$(PACMAN_INSTALL) vlc vlc-plugin-ffmpeg arandr blueman visual-studio-code-bin discord dunst filezilla flameshot ghex google-chrome gparted kdenlive kompare libreoffice-fresh meld okular qbittorrent torbrowser-launcher wireshark-qt ghidra signal-desktop dragon-drop-git nomachine emote guvcview audacity polkit-gnome
-	[ ! -f /.dockerenv ] && $(PACMAN_INSTALL) flatpak && flatpak install -y flathub com.obsproject.Studio && flatpak install -y flathub org.gnome.Snapshot || true
+	[[ ! -f /.dockerenv ]] && $(PACMAN_INSTALL) flatpak && flatpak install -y flathub com.obsproject.Studio && flatpak install -y flathub org.gnome.Snapshot || true
 	# Do not start services in docker
-	[ ! -f /.dockerenv ] && sudo systemctl disable --now nxserver.service || true
+	[[ ! -f /.dockerenv ]] && sudo systemctl disable --now nxserver.service || true
 	xargs -n1 -I{} code --install-extension {} --force < config/extensions.txt
-	for pkg in fswebcam cursor-bin; do yay --noconfirm --needed -S "$$pkg" || echo -e "$(C_WARN) Failed to install $$pkg, continuing...$(C_RST)"; done
+	for pkg in fswebcam cursor-bin; do yay --noconfirm --needed -S "$$pkg" || $(call WARN,Failed to install $$pkg$(comma) continuing...); done
 	sudo ln -sf /usr/bin/google-chrome-stable /usr/local/bin/gog
-	echo -e "$(C_OK) GUI applications installed!$(C_RST)"
+	$(call DONE,GUI applications installed!)
 
 install-offensive: sanity-check ## Install offensive & security tools
-	echo -e "$(C_INFO) Installing offensive tools...$(C_RST)"
+	$(call INFO,Installing offensive tools...)
 	$(PACMAN_INSTALL) metasploit fx lazygit fq gitleaks jdk21-openjdk burpsuite hashcat bettercap
 	sudo sed -i 's#$$JAVA_HOME#/usr/lib/jvm/java-21-openjdk#g' /usr/bin/burpsuite
-	for pkg in ffuf gau pdtm-bin waybackurls fabric-ai-bin; do yay --noconfirm --needed -S "$$pkg" || echo -e "$(C_WARN) Failed to install $$pkg, continuing...$(C_RST)"; done
-	[ -f /usr/bin/pdtm ] && sudo chown "$$USER:$$USER" /usr/bin/pdtm && sudo mv /usr/bin/pdtm ~/.pdtm/go/bin || true
+	for pkg in ffuf gau pdtm-bin waybackurls fabric-ai-bin; do yay --noconfirm --needed -S "$$pkg" || $(call WARN,Failed to install $$pkg$(comma) continuing...); done
 
 	# Hide stdout and Keep stderr for CI builds -- run go installs in parallel
 	mise exec -- go install github.com/sw33tLie/sns@latest > /dev/null &
@@ -230,211 +236,196 @@ install-offensive: sanity-check ## Install offensive & security tools
 		&& wpprobe update-db ) || true
 
 	# pdtm hits GitHub API rate limits (60 req/h unauthenticated) -- retry after reset (~4min)
+	[[ -f /usr/bin/pdtm ]] && { mkdir -p ~/.pdtm/go/bin; sudo chown "$$USER:$$USER" /usr/bin/pdtm; sudo mv /usr/bin/pdtm ~/.pdtm/go/bin; ~/.pdtm/go/bin/pdtm -u pdtm; } || true
 	for attempt in 1 2 3 4 5; do \
 		zsh -c "source ~/.zshrc && pdtm -install-all -v" && break || { \
-			echo -e "$(C_WARN) pdtm install failed (attempt $$attempt/5), likely rate-limited. Waiting 4m for reset...$(C_RST)" ; \
+			$(call WARN,pdtm install failed (attempt $$attempt/5)$(comma) likely rate-limited. Waiting 4m for reset...) ; \
 			sleep 240 ; \
 		} ; \
 	done || true
 	zsh -c "source ~/.zshrc && nuclei -update-templates -update-template-dir ~/.nuclei-templates" || true
+	rm -rf /tmp/nuclei[0-9]*
 
 	# Clone custom tools -- run in parallel
-	ska_clone() { [ ! -d "/opt/$$2" ] && git clone --depth=1 "$$1" "/tmp/$$2" && sudo mv "/tmp/$$2" "/opt/$$2" || true ; }
-	ska_clone https://github.com/jpillora/chisel chisel &
-	ska_clone https://github.com/ambionics/phpggc phpggc &
-	ska_clone https://github.com/CBHue/PyFuscation PyFuscation &
-	ska_clone https://github.com/christophetd/CloudFlair CloudFlair &
-	ska_clone https://github.com/minos-org/minos-static minos-static &
-	ska_clone https://github.com/offensive-security/exploit-database exploit-database &
-	ska_clone https://gitlab.com/exploit-database/exploitdb exploitdb &
-	ska_clone https://github.com/laluka/pty4all pty4all &
-	ska_clone https://github.com/laluka/pypotomux pypotomux &
+	ska_clone() { local pkg=$${1##*/}; [[ ! -d "/opt/$$pkg" ]] && git clone --depth=1 "$$1" "/tmp/$$pkg" && sudo mv "/tmp/$$pkg" "/opt/$$pkg" || true ; }
+	ska_clone https://github.com/jpillora/chisel &
+	ska_clone https://github.com/ambionics/phpggc &
+	ska_clone https://github.com/CBHue/PyFuscation &
+	ska_clone https://github.com/christophetd/CloudFlair &
+	ska_clone https://github.com/minos-org/minos-static &
+	ska_clone https://github.com/offensive-security/exploit-database &
+	ska_clone https://gitlab.com/exploit-database/exploitdb &
+	ska_clone https://github.com/laluka/pty4all &
+	ska_clone https://github.com/laluka/pypotomux &
 	wait
-	echo -e "$(C_OK) Offensive tools installed!$(C_RST)"
+	$(call DONE,Offensive tools installed!)
 
 install-wordlists: sanity-check ## Install wordlists (SecLists, rockyou, etc.)
-	echo -e "$(C_INFO) Installing wordlists...$(C_RST)"
-	[ ! -d /opt/lists ] && sudo mkdir -p /opt/lists && sudo chown "$$USER:$$USER" /opt/lists || true
+	$(call INFO,Installing wordlists...)
+	[[ ! -d /opt/lists ]] && sudo mkdir -p /opt/lists && sudo chown "$$USER:$$USER" /opt/lists || true
 	# Download all wordlists in parallel
-	( [ ! -f /opt/lists/rockyou.txt ] && curl -L https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt -o /opt/lists/rockyou.txt || true ) &
-	( [ ! -d /opt/lists/PayloadsAllTheThings ] && git clone --depth=1 https://github.com/swisskyrepo/PayloadsAllTheThings /opt/lists/PayloadsAllTheThings || true ) &
-	( [ ! -d /opt/lists/BruteX ] && git clone --depth=1 https://github.com/1N3/BruteX /opt/lists/BruteX || true ) &
-	( [ ! -d /opt/lists/IntruderPayloads ] && git clone --depth=1 https://github.com/1N3/IntruderPayloads /opt/lists/IntruderPayloads || true ) &
-	( [ ! -d /opt/lists/Probable-Wordlists ] && git clone --depth=1 https://github.com/berzerk0/Probable-Wordlists /opt/lists/Probable-Wordlists || true ) &
-	( [ ! -d /opt/lists/Open-Redirect-Payloads ] && git clone --depth=1 https://github.com/cujanovic/Open-Redirect-Payloads /opt/lists/Open-Redirect-Payloads || true ) &
-	( [ ! -d /opt/lists/SecLists ] && git clone --depth=1 https://github.com/danielmiessler/SecLists /opt/lists/SecLists || true ) &
-	( [ ! -d /opt/lists/Pwdb-Public ] && git clone --depth=1 https://github.com/ignis-sec/Pwdb-Public /opt/lists/Pwdb-Public || true ) &
-	( [ ! -d /opt/lists/Bug-Bounty-Wordlists ] && git clone --depth=1 https://github.com/Karanxa/Bug-Bounty-Wordlists /opt/lists/Bug-Bounty-Wordlists || true ) &
-	( [ ! -d /opt/lists/richelieu ] && git clone --depth=1 https://github.com/tarraschk/richelieu /opt/lists/richelieu || true ) &
-	( [ ! -d /opt/lists/webapp-wordlists ] && git clone --depth=1 https://github.com/p0dalirius/webapp-wordlists /opt/lists/webapp-wordlists || true ) &
+	ska_clone_list() { local pkg=$${1##*/}; [[ ! -d "/opt/lists/$$pkg" ]] && git clone --depth=1 "$$1" "/var/tmp/$$pkg" && sudo mv "/var/tmp/$$pkg" "/opt/lists/$$pkg" || true ; }
+	( [[ ! -f /opt/lists/rockyou.txt ]] && curl -L https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt -o /opt/lists/rockyou.txt || true ) &
+	ska_clone_list https://github.com/swisskyrepo/PayloadsAllTheThings &
+	ska_clone_list https://github.com/1N3/BruteX &
+	ska_clone_list https://github.com/1N3/IntruderPayloads &
+	ska_clone_list https://github.com/berzerk0/Probable-Wordlists &
+	ska_clone_list https://github.com/cujanovic/Open-Redirect-Payloads &
+	ska_clone_list https://github.com/danielmiessler/SecLists &
+	ska_clone_list https://github.com/ignis-sec/Pwdb-Public &
+	ska_clone_list https://github.com/Karanxa/Bug-Bounty-Wordlists &
+	ska_clone_list https://github.com/tarraschk/richelieu &
+	ska_clone_list https://github.com/p0dalirius/webapp-wordlists &
 	wait
-	echo -e "$(C_OK) Wordlists installed!$(C_RST)"
+	$(call DONE,Wordlists installed!)
 
 install-hardening: sanity-check ## Install hardening tools (opensnitch)
-	echo -e "$(C_INFO) Installing hardening tools...$(C_RST)"
+	$(call INFO,Installing hardening tools...)
 	$(PACMAN_INSTALL) opensnitch
 	# OPT-IN opensnitch as an egress firewall
 	# sudo systemctl enable --now opensnitchd.service
-	echo -e "$(C_OK) Hardening tools installed!$(C_RST)"
+	$(call DONE,Hardening tools installed!)
 
 update: sanity-check ## Update SkillArch (pull & prompt reinstall)
-	@[ -n "$$(git status --porcelain)" ] && echo "Error: git state is dirty, please \"git stash\" your changes before updating" && exit 1 || true
-	[ "$$(git rev-parse --abbrev-ref HEAD)" != "main" ] && echo "Error: current branch is not main, please switch to main before updating" && exit 1 || true
+	@[[ -n "$$(git status --porcelain)" ]] && echo "Error: git state is dirty, please \"git stash\" your changes before updating" && exit 1 || true
+	[[ "$$(git rev-parse --abbrev-ref HEAD)" != "main" ]] && echo "Error: current branch is not main, please switch to main before updating" && exit 1 || true
 	git pull
-	echo -e "$(C_OK) SkillArch updated, please run make install to apply changes$(C_RST)"
+	$(call DONE,SkillArch updated$(comma) please run make install to apply changes)
 
 # ============================================================
 # Smoke Tests
 # ============================================================
 
 test: ## Validate installation (smoke tests)
-	echo -e "$(C_INFO)$(C_BOLD) Running SkillArch smoke tests...$(C_RST)"
-	PASS=0
-	FAIL=0
-	TOTAL=0
+	$(call INFO,Running SkillArch smoke tests...)
+	@PASS=0 FAIL=0 TOTAL=0
 	ska_check() {
-		TOTAL=$$((TOTAL + 1))
-		if eval "$$2" > /dev/null 2>&1 ; then
-			echo -e "  $(C_OK)[PASS]$(C_RST) $$1"
-			PASS=$$((PASS + 1))
+		tool="$$1"
+		cmd="$$2"
+		((TOTAL++)) || true
+		if eval "$$cmd" > /dev/null 2>&1 ; then
+			$(call OK,  [PASS]$(C_RST) $$tool)
+			((PASS++))
 		else
-			echo -e "  $(C_ERR)[FAIL]$(C_RST) $$1"
-			FAIL=$$((FAIL + 1))
-		fi
+			$(call ERR,  [FAIL]$(C_RST) $$tool ($$cmd))
+			((FAIL++))
+		fi || true
 	}
-	echo -e "\n$(C_BOLD)--- Critical Binaries ---$(C_RST)"
-	ska_check "zsh"        "which zsh"
-	ska_check "git"        "which git"
-	ska_check "nvim"       "which nvim"
-	ska_check "tmux"       "which tmux"
-	ska_check "nmap"       "which nmap"
-	ska_check "curl"       "which curl"
-	ska_check "wget"       "which wget"
-	ska_check "jq"         "which jq"
-	ska_check "ripgrep"    "which rg"
-	ska_check "bat"        "which bat"
-	ska_check "eza"        "which eza"
-	ska_check "fzf"        "which fzf || [ -f ~/.fzf/bin/fzf ]"
-	ska_check "trash-put"  "which trash-put"
-	echo -e "\n$(C_BOLD)--- Offensive Tools ---$(C_RST)"
-	ska_check "nmap"       "which nmap"
-	ska_check "ffuf"       "which ffuf"
-	ska_check "sqlmap"     "which sqlmap || pipx list 2>/dev/null | grep -q sqlmap"
-	ska_check "nuclei"     "which nuclei || [ -f ~/.pdtm/go/bin/nuclei ]"
-	ska_check "httpx"      "which httpx || [ -f ~/.pdtm/go/bin/httpx ]"
-	ska_check "subfinder"  "which subfinder || [ -f ~/.pdtm/go/bin/subfinder ]"
-	ska_check "gef"          "[ -f ~/.gdbinit-gef.py ]"
-	ska_check "metasploit"   "which msfconsole"
-	ska_check "hashcat"      "which hashcat"
-	ska_check "bettercap"    "which bettercap"
-	ska_check "gobypass403"  "which gobypass403"
-	ska_check "wpprobe"      "which wpprobe"
-	echo -e "\n$(C_BOLD)--- Shell & Config ---$(C_RST)"
-	ska_check "oh-my-zsh"  "[ -d ~/.oh-my-zsh ]"
-	ska_check "zshrc link" "[ -L ~/.zshrc ]"
-	ska_check "tmux.conf"  "[ -L ~/.tmux.conf ]"
-	ska_check "vimrc"      "[ -L ~/.vimrc ]"
-	ska_check "nvim init"  "[ -L ~/.config/nvim/init.lua ]"
-	ska_check "ssh dir"    "[ -d ~/.ssh ]"
-	echo -e "\n$(C_BOLD)--- Runtimes (mise) ---$(C_RST)"
+	$(call BOLD,\n--- Critical Binaries ---)
+	for bin in zsh git nvim tmux nmap curl wget jq rg bat eza trash-put; do
+		ska_check "$$bin" "which $$bin"
+	done
+	ska_check "fzf"        "which fzf || [[ -f ~/.fzf/bin/fzf ]]"
+	$(call BOLD,\n--- Offensive Tools ---)
+	for bin in nmap ffuf msfconsole hashcat bettercap gobypass403 wpprobe; do
+		ska_check "$$bin" "which $$bin"
+	done
+	ska_check "sqlmap"      "which sqlmap || [[ -f ~/.local/bin/sqlmap ]]"
+	ska_check "nuclei"      "which nuclei || [[ -f ~/.pdtm/go/bin/nuclei ]]"
+	ska_check "httpx"       "which httpx || [[ -f ~/.pdtm/go/bin/httpx ]]"
+	ska_check "subfinder"   "which subfinder || [[ -f ~/.pdtm/go/bin/subfinder ]]"
+	ska_check "gef"         "[[ -f ~/.gdbinit-gef.py ]]"
+	$(call BOLD,\n--- Shell & Config ---)
+	ska_check "oh-my-zsh"  "[[ -d ~/.oh-my-zsh ]]"
+	ska_check "zshrc link" "[[ -L ~/.zshrc ]]"
+	ska_check "tmux.conf"  "[[ -L ~/.tmux.conf ]]"
+	ska_check "vimrc"      "[[ -L ~/.vimrc ]]"
+	ska_check "nvim init"  "[[ -L ~/.config/nvim/init.lua ]]"
+	ska_check "ssh dir"    "[[ -d ~/.ssh ]]"
+	$(call BOLD,\n--- Runtimes (mise) ---)
 	ska_check "python"     "mise exec -- python --version"
 	ska_check "node"       "mise exec -- node --version"
 	ska_check "go"         "mise exec -- go version"
 	ska_check "rust"       "mise exec -- rustc --version"
-	echo -e "\n$(C_BOLD)--- Directories ---$(C_RST)"
-	ska_check "/DATA"      "[ -d /DATA ]"
-	ska_check "/opt/skillarch" "[ -d /opt/skillarch ]"
+	$(call BOLD,\n--- Directories ---)
+	ska_check "/DATA"      "[[ -d /DATA ]]"
+	ska_check "/opt/skillarch" "[[ -d /opt/skillarch ]]"
 	echo ""
-	if [ "$$FAIL" -eq 0 ]; then
-		echo -e "$(C_OK)$(C_BOLD) All $$TOTAL tests passed!$(C_RST)"
+	if [[ "$$FAIL" -eq 0 ]]; then
+		$(call OK,$(C_BOLD) All $$TOTAL tests passed!)
 	else
-		echo -e "$(C_WARN)$(C_BOLD) $$PASS/$$TOTAL passed, $$FAIL failed$(C_RST)"
-		echo -e "$(C_INFO) Some failures may be expected if you ran a partial install (e.g., lite only)$(C_RST)"
+		$(call WARN,$(C_BOLD) $$PASS/$$TOTAL passed$(comma) $$FAIL failed)
+		$(call INFO,Some failures may be expected if you ran a partial install (e.g.$(comma) lite only))
 	fi
 
 test-lite: ## Validate lite Docker image install
-	echo -e "$(C_INFO)$(C_BOLD) Running SkillArch LITE smoke tests...$(C_RST)"
-	PASS=0
-	FAIL=0
-	TOTAL=0
+	$(call INFO,$(C_BOLD) Running SkillArch LITE smoke tests...)
+	@PASS=0 FAIL=0 TOTAL=0
 	ska_check() {
-		TOTAL=$$((TOTAL + 1))
-		if eval "$$2" > /dev/null 2>&1 ; then
-			echo -e "  $(C_OK)[PASS]$(C_RST) $$1"
-			PASS=$$((PASS + 1))
+		((TOTAL++)) || true
+		tool="$$1"
+		cmd="$$2"
+		if eval "$$cmd" > /dev/null 2>&1 ; then
+			$(call OK,  [PASS]$(C_RST) $$tool)
+			((PASS++))
 		else
-			echo -e "  $(C_ERR)[FAIL]$(C_RST) $$1"
-			FAIL=$$((FAIL + 1))
-		fi
+			$(call ERR,  [FAIL]$(C_RST) $$tool ($$cmd))
+			((FAIL++))
+		fi || true
 	}
-	echo -e "\n$(C_BOLD)--- Core Binaries ---$(C_RST)"
+	$(call BOLD,\n--- Core Binaries ---)
 	for bin in zsh git nvim tmux nmap curl wget jq rg bat eza trash-put; do
 		ska_check "$$bin" "which $$bin"
 	done
-	echo -e "\n$(C_BOLD)--- Offensive Tools ---$(C_RST)"
-	for bin in ffuf hashcat bettercap msfconsole; do
+	$(call BOLD,\n--- Offensive Tools ---)
+	for bin in ffuf hashcat bettercap msfconsole gobypass403 wpprobe; do
 		ska_check "$$bin" "which $$bin"
 	done
-	ska_check "nuclei"      "which nuclei || [ -f ~/.pdtm/go/bin/nuclei ]"
-	ska_check "httpx"       "which httpx || [ -f ~/.pdtm/go/bin/httpx ]"
-	ska_check "gobypass403" "which gobypass403"
-	ska_check "wpprobe"     "which wpprobe"
-	ska_check "gef"         "[ -f ~/.gdbinit-gef.py ]"
-	echo -e "\n$(C_BOLD)--- Shell & Config ---$(C_RST)"
-	ska_check "oh-my-zsh" "[ -d ~/.oh-my-zsh ]"
-	ska_check "zshrc"     "[ -L ~/.zshrc ]"
-	ska_check "nvim init" "[ -L ~/.config/nvim/init.lua ]"
-	echo -e "\n$(C_BOLD)--- Runtimes ---$(C_RST)"
+	ska_check "nuclei"    "which nuclei || [[ -f ~/.pdtm/go/bin/nuclei ]]"
+	ska_check "httpx"     "which httpx || [[ -f ~/.pdtm/go/bin/httpx ]]"
+	ska_check "gef"       "[[ -f ~/.gdbinit-gef.py ]]"
+	$(call BOLD,\n--- Shell & Config ---)
+	ska_check "oh-my-zsh" "[[ -d ~/.oh-my-zsh ]]"
+	ska_check "zshrc"     "[[ -L ~/.zshrc ]]"
+	ska_check "nvim init" "[[ -L ~/.config/nvim/init.lua ]]"
+	$(call BOLD,\n--- Runtimes ---)
 	ska_check "python"    "mise exec -- python --version"
 	ska_check "node"      "mise exec -- node --version"
 	ska_check "go"        "mise exec -- go version"
 	echo ""
-	if [ "$$FAIL" -eq 0 ]; then
-		echo -e "$(C_OK)$(C_BOLD) All $$TOTAL lite tests passed!$(C_RST)"
+	if [[ "$$FAIL" -eq 0 ]]; then
+		$(call OK,$(C_BOLD) All $$TOTAL lite tests passed!)
 	else
-		echo -e "$(C_ERR)$(C_BOLD) $$PASS/$$TOTAL passed, $$FAIL failed$(C_RST)"
+		$(call ERR,$(C_BOLD) $$PASS/$$TOTAL passed$(comma) $$FAIL failed)
 		exit 1
 	fi
 
 test-full: test ## Validate full Docker image install (runs test + extras)
-	echo -e "$(C_INFO)$(C_BOLD) Running SkillArch FULL extra tests...$(C_RST)"
-	PASS=0
-	FAIL=0
-	TOTAL=0
+	$(call INFO,$(C_BOLD) Running SkillArch FULL extra tests...)
+	@PASS=0 FAIL=0 TOTAL=0
 	ska_check() {
-		TOTAL=$$((TOTAL + 1))
-		if eval "$$2" > /dev/null 2>&1 ; then
-			echo -e "  $(C_OK)[PASS]$(C_RST) $$1"
-			PASS=$$((PASS + 1))
+		((TOTAL++)) || true
+		tool="$$1"
+		cmd="$$2"
+		if eval "$$cmd" > /dev/null 2>&1 ; then
+			$(call OK,  [PASS]$(C_RST) $$tool)
+			((PASS++))
 		else
-			echo -e "  $(C_ERR)[FAIL]$(C_RST) $$1"
-			FAIL=$$((FAIL + 1))
-		fi
+			$(call ERR,  [FAIL]$(C_RST) $$tool ($$cmd))
+			((FAIL++))
+		fi || true
 	}
-	echo -e "\n$(C_BOLD)--- GUI Binaries ---$(C_RST)"
-	ska_check "i3"       "which i3"
-	ska_check "kitty"    "which kitty"
-	ska_check "polybar"  "which polybar"
-	ska_check "rofi"     "which rofi"
-	ska_check "picom"    "which picom"
-	ska_check "code"     "which code"
-	echo -e "\n$(C_BOLD)--- GUI Config Symlinks ---$(C_RST)"
-	ska_check "i3 config"      "[ -L ~/.config/i3/config ]"
-	ska_check "polybar config" "[ -L ~/.config/polybar/config.ini ]"
-	ska_check "polybar launch" "[ -L ~/.config/polybar/launch.sh ]"
-	ska_check "kitty config"   "[ -L ~/.config/kitty/kitty.conf ]"
-	ska_check "picom config"   "[ -L ~/.config/picom.conf ]"
-	ska_check "rofi config"    "[ -L ~/.config/rofi/config.rasi ]"
-	echo -e "\n$(C_BOLD)--- Wordlists ---$(C_RST)"
-	ska_check "/opt/lists"        "[ -d /opt/lists ]"
-	ska_check "rockyou.txt"       "[ -f /opt/lists/rockyou.txt ]"
-	ska_check "SecLists"          "[ -d /opt/lists/SecLists ]"
-	ska_check "PayloadsAllThings" "[ -d /opt/lists/PayloadsAllTheThings ]"
+	$(call BOLD,\n--- GUI Binaries ---)
+	for bin in i3 kitty polybar rofi picom code; do
+		ska_check "$$bin" "which $$bin"
+	done
+	$(call BOLD,\n--- GUI Config Symlinks ---)
+	ska_check "i3 config"      "[[ -L ~/.config/i3/config ]]"
+	ska_check "polybar config" "[[ -L ~/.config/polybar/config.ini ]]"
+	ska_check "polybar launch" "[[ -L ~/.config/polybar/launch.sh ]]"
+	ska_check "kitty config"   "[[ -L ~/.config/kitty/kitty.conf ]]"
+	ska_check "picom config"   "[[ -L ~/.config/picom.conf ]]"
+	ska_check "rofi config"    "[[ -L ~/.config/rofi/config.rasi ]]"
+	$(call BOLD,\n--- Wordlists ---)
+	ska_check "/opt/lists"        "[[ -d /opt/lists ]]"
+	ska_check "rockyou.txt"       "[[ -f /opt/lists/rockyou.txt ]]"
+	ska_check "SecLists"          "[[ -d /opt/lists/SecLists ]]"
+	ska_check "PayloadsAllThings" "[[ -d /opt/lists/PayloadsAllTheThings ]]"
 	echo ""
-	if [ "$$FAIL" -eq 0 ]; then
-		echo -e "$(C_OK)$(C_BOLD) All $$TOTAL full tests passed!$(C_RST)"
+	if [[ "$$FAIL" -eq 0 ]]; then
+		$(call OK,$(C_BOLD) All $$TOTAL full tests passed!)
 	else
-		echo -e "$(C_ERR)$(C_BOLD) $$PASS/$$TOTAL passed, $$FAIL failed$(C_RST)"
+		$(call ERR,$(C_BOLD) $$PASS/$$TOTAL passed$(comma) $$FAIL failed)
 		exit 1
 	fi
 
@@ -443,14 +434,14 @@ test-full: test ## Validate full Docker image install (runs test + extras)
 # ============================================================
 
 doctor: ## Diagnose system health & common issues
-	echo -e "$(C_INFO)$(C_BOLD) SkillArch Doctor$(C_RST)"
-	echo -e "$(C_BOLD)=================$(C_RST)\n"
+	$(call INFO,$(C_BOLD) SkillArch Doctor)
+	$(call BOLD,=================\n)
 	# Disk space
-	echo -e "$(C_BOLD)--- Disk Space ---$(C_RST)"
+	$(call BOLD,--- Disk Space ---)
 	df -h / /DATA /opt 2>/dev/null | grep -vF "Filesystem" | awk '{printf "  %-20s %s used / %s total (%s)\n", $$6, $$3, $$2, $$5}'
 	echo ""
 	# Docker daemon
-	echo -e "$(C_BOLD)--- Docker ---$(C_RST)"
+	$(call BOLD,--- Docker ---)
 	if docker info > /dev/null 2>&1; then
 		echo -e "  $(C_OK)[OK]$(C_RST) Docker daemon running"
 		echo "  Images: $$(docker images -q 2>/dev/null | wc -l), Containers: $$(docker ps -aq 2>/dev/null | wc -l)"
@@ -459,27 +450,27 @@ doctor: ## Diagnose system health & common issues
 	fi
 	echo ""
 	# Backup files
-	echo -e "$(C_BOLD)--- Backed-up Configs (.skabak) ---$(C_RST)"
+	$(call BOLD,--- Backed-up Configs (.skabak) ---)
 	SKABAK_FILES=$$(find ~ /etc/X11 -name "*.skabak" 2>/dev/null || true)
-	if [ -n "$$SKABAK_FILES" ]; then
+	if [[ -n "$$SKABAK_FILES" ]]; then
 		echo "$$SKABAK_FILES" | while read -r f; do echo "  $$f"; done
 	else
 		echo "  None found (clean install)"
 	fi
 	echo ""
 	# Broken symlinks
-	echo -e "$(C_BOLD)--- Broken Symlinks (config) ---$(C_RST)"
+	$(call BOLD,--- Broken Symlinks (config) ---)
 	BROKEN=""
 	for link in ~/.zshrc ~/.tmux.conf ~/.vimrc ~/.config/nvim/init.lua ~/.config/i3/config ~/.config/polybar/config.ini ~/.config/polybar/launch.sh ~/.config/kitty/kitty.conf ~/.config/picom.conf ~/.config/rofi/config.rasi; do
-		if [ -L "$$link" ] && [ ! -e "$$link" ]; then
+		if [[ -L "$$link" ]] && [[ ! -e "$$link" ]]; then
 			echo -e "  $(C_ERR)[BROKEN]$(C_RST) $$link -> $$(readlink $$link)"
 			BROKEN="yes"
 		fi
 	done
-	[ -z "$$BROKEN" ] && echo -e "  $(C_OK)[OK]$(C_RST) All config symlinks valid"
+	[[ -z "$$BROKEN" ]] && echo -e "  $(C_OK)[OK]$(C_RST) All config symlinks valid"
 	echo ""
 	# System info
-	echo -e "$(C_BOLD)--- System Info ---$(C_RST)"
+	$(call BOLD,--- System Info ---)
 	echo "  OS: $$(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '"' || echo 'unknown')"
 	echo "  Kernel: $$(uname -r)"
 	echo "  Shell: $$SHELL"
@@ -488,54 +479,57 @@ doctor: ## Diagnose system health & common issues
 	echo ""
 
 list-tools: ## List installed offensive tools & versions
-	echo -e "$(C_INFO)$(C_BOLD) SkillArch Tool Inventory$(C_RST)"
-	echo -e "$(C_BOLD)==========================$(C_RST)\n"
+	$(call INFO,$(C_BOLD) SkillArch Tool Inventory)
+	$(call BOLD,==========================\n)
 	ska_ver() {
 		VER=$$(eval "$$2" 2>/dev/null | head -1 || echo "not found")
 		printf "  %-20s %s\n" "$$1" "$$VER"
 	}
-	echo -e "$(C_BOLD)--- Core ---$(C_RST)"
+	PATH=$$PATH:~/.local/bin:~/.pdtm/go/bin
+	$(call BOLD,--- Core ---)
 	ska_ver "git"       "git --version"
 	ska_ver "zsh"       "zsh --version"
 	ska_ver "nvim"      "nvim --version | head -1"
 	ska_ver "tmux"      "tmux -V"
 	ska_ver "docker"    "docker --version"
-	echo -e "\n$(C_BOLD)--- Runtimes (mise) ---$(C_RST)"
+	$(call BOLD,\n--- Runtimes (mise) ---)
 	ska_ver "python"    "mise exec -- python --version"
 	ska_ver "node"      "mise exec -- node --version"
 	ska_ver "go"        "mise exec -- go version"
 	ska_ver "rust"      "mise exec -- rustc --version"
-	echo -e "\n$(C_BOLD)--- Offensive ---$(C_RST)"
+	$(call BOLD,\n--- Offensive ---)
 	ska_ver "nmap"       "nmap --version | head -1"
 	ska_ver "ffuf"       "ffuf -V 2>&1 | head -1"
 	ska_ver "nuclei"     "nuclei -version 2>&1 | head -1"
-	ska_ver "httpx"      "httpx -version 2>&1 | head -1"
+	ska_ver "httpx"      "httpx -version 2>&1 | tail -1"
 	ska_ver "subfinder"  "subfinder -version 2>&1 | head -1"
 	ska_ver "sqlmap"     "sqlmap --version 2>&1 | head -1"
 	ska_ver "msfconsole" "msfconsole --version 2>&1 | head -1"
 	ska_ver "hashcat"    "hashcat --version 2>&1 | head -1"
-	ska_ver "bettercap"  "bettercap -eval 'quit' 2>&1 | grep -i version | head -1"
+	ska_ver "bettercap"  "bettercap -version"
 	ska_ver "gitleaks"   "gitleaks version 2>&1"
-	ska_ver "burpsuite"  "echo 'installed (GUI)'"
-	ska_ver "ghidra"     "echo 'installed (GUI)'"
+	ska_ver "burpsuite"  "burpsuite --version" ## "echo 'installed (GUI)'"
+	ska_ver "ghidra"     "cat /opt/ghidra/bom.json| jq -r '.components[].version'|head -1" ## "echo 'installed (GUI)'"
 	ska_ver "wireshark"  "wireshark --version 2>&1 | head -1"
-	echo -e "\n$(C_BOLD)--- Pipx Tools ---$(C_RST)"
-	pipx list --short 2>/dev/null || echo "  pipx not available"
-	echo -e "\n$(C_BOLD)--- Pdtm Tools ---$(C_RST)"
-	ls ~/.pdtm/go/bin/ 2>/dev/null | while read -r tool; do echo "  $$tool"; done || echo "  pdtm not installed"
+	$(call BOLD,\n--- uv Tools ---)
+	eval "$$(mise activate bash)" || true
+	uv tool list 2>/dev/null | grep -v '-' | pr -o2 -t || echo "  uv not available"
+	$(call BOLD,\n--- Pdtm Tools ---)
+	## ls ~/.pdtm/go/bin/ 2>/dev/null | while read -r tool; do echo "  %$$tool"; echo "$$($$tool --version 2>&1|tail -1)"; done || echo "  pdtm not installed"
+	pdtm 2>&1 | awk '/^[0-9]+\./ {gsub(/\033\[[0-9;]*[mK]/, ""); sub(/^[0-9]+\./, " "); print}'  || echo "  pdtm not installed"
 	echo ""
 
 backup: ## Backup current configs before overwriting
 	BACKUP_DIR="$$HOME/.skillarch-backup-$$(date +%Y%m%d-%H%M%S)"
 	mkdir -p "$$BACKUP_DIR"
-	echo -e "$(C_INFO) Backing up configs to $$BACKUP_DIR$(C_RST)"
+	$(call INFO,Backing up configs to $$BACKUP_DIR)
 	for file in ~/.zshrc ~/.tmux.conf ~/.vimrc ~/.config/nvim/init.lua ~/.config/i3/config ~/.config/polybar/config.ini ~/.config/polybar/launch.sh ~/.config/kitty/kitty.conf ~/.config/picom.conf ~/.config/rofi/config.rasi /etc/X11/xorg.conf.d/30-touchpad.conf; do
-		if [ -f "$$file" ] || [ -L "$$file" ]; then
+		if [[ -f "$$file" ]] || [[ -L "$$file" ]]; then
 			DEST="$$BACKUP_DIR/$$(basename $$file)"
 			cp -L "$$file" "$$DEST" 2>/dev/null && echo "  Backed up: $$file" || true
 		fi
 	done
-	echo -e "$(C_OK) Backup complete: $$BACKUP_DIR$(C_RST)"
+	$(call OK,Backup complete: $$BACKUP_DIR)
 
 # ============================================================
 # Docker Targets
@@ -560,7 +554,7 @@ docker-run-full: ## Run full Docker image locally
 
 clean: ## Clean up system and remove unnecessary files
 	set +e # Cleanup should be best-effort, never fail the build
-	[ ! -f /.dockerenv ] && exit 0
+	[[ ! -f /.dockerenv ]] && exit 0
 	sudo pacman --noconfirm -Scc || true
 	sudo pacman --noconfirm -Sc || true
 	sudo pacman -Rns $$(pacman -Qtdq) 2>/dev/null || true
