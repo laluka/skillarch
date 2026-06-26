@@ -99,6 +99,7 @@ alias tn='tmux new'
 alias ta='tmux attach'
 alias b='bat'
 alias batall='find . -type f | xargs bat'
+alias batsh='bat -l sh'
 alias v='nvim'
 alias c='code'
 alias C='code .'
@@ -113,6 +114,7 @@ alias git-clone-all-github='curl -sk -H "Authorization: token ${GITHUB_READ_TOKE
 alias git-clone-all-gitlab='curl -sk -H "Authorization: Bearer ${GITLAB_READ_TOKEN}" "https://gitlab.com/api/v4/projects?owned=true&simple=true" | jq -r ".[].ssh_url_to_repo" | parallel -j10 "git clone {}"'
 alias git-pull-all='find . -maxdepth 2 -name ".git" | cut -d/ -f2 | parallel -j10 "cd {} && git pull"'
 alias gdh='git diff HEAD'
+alias gst='git status --short'
 
 # ────────────────────────────────────────
 #  File Management
@@ -161,7 +163,7 @@ alias flameshotz='while true; do flameshot full -p ~/Downloads; sleep 1; done'
 # ────────────────────────────────────────
 alias show-disk-io='watch -cd -- iostat -h'
 alias sdi='show-disk-io'
-alias show-open-ports='sudo ss -lntp | grep -i listen | grep -P ":\K\d+"'
+alias show-open-ports="sudo ss -lntup | awk 'NR>1 {print \$1,\$5,\$6,\$7}'| {echo 'TCP/UDP Local:Port Peer:Port Process';sort -V} | column -t | grep -P 'TCP\K|:\K\d+ '"
 alias sop='show-open-ports'
 alias get-du='du -hd1 2>/dev/null'
 alias get-pid-click='xprop _NET_WM_PID | cut -d" " -f3'
@@ -191,8 +193,8 @@ alias mcrypt-enc='f(){ PASS=$(cat /dev/urandom | base64 | head -c 20) && echo "$
 alias mcrypt-dec='mdecrypt'
 alias get-meteo='curl https://wttr.in/'
 alias fab='fabric-ai -s'
-alias fzf-h='print -z $(builtin fc -n -l 1|fzf --height=50% --tac --prompt="Command from history > " --preview="print {}" --preview-window="down:3:wrap")'
 xh() { [[ -z "$1" ]] && return ||  xxd "${@: -1}" | head "${@: 1:#-1}"; }
+alias fzf-h='print -z $(builtin fc -n -l 1|fzf --height=50% --tac --prompt="Command from history > " --preview="print {}" --preview-window="down:3:wrap")'
 bindkey -s '^h' "fzf-h\n"
 cmd_picker_select() {
     local md_file="${1:-/opt/skillarch/commands.md}"
@@ -226,6 +228,12 @@ bindkey '^f' _cmd_picker_widget
 alias pv='f(){ if [ -z "$1" ] ; then echo "Use: pv 3.12" ; else mise use "python@$1" ; mise config set env._.python.venv.path .venv ; mise config set --type list env._.python.venv.uv_create_args -- --seed ; mise config set --type bool env._.python.venv.create true ; mise exec -- which python ; mise exec -- python --version ; fi;  unset -f f; }; f'
 alias pyreq='pip install -r requirements.txt'
 alias pysrv='mkdir -pv /tmp/empty && python -m http.server -d /tmp/empty'
+alias uvv='uv venv .venv && source .venv/bin/activate'
+alias uvr='uv run'
+alias uvp='uv pip install'
+alias uvreq='uv pip install -r requirements.txt'
+alias uva='uv add --script' # to update a script with a lib (mytool.py added_lib) or with requirements.txt (mytool.py -r requirements.txt)
+alias uvpwn='uvx --with pwntools python'
 
 # ────────────────────────────────────────
 #  Data Generation & Encoding
@@ -303,7 +311,7 @@ sha1() { args_to_stdin "$@" | sha1sum | awk '{print$1}'; }
 sha256() { args_to_stdin "$@" | sha256sum | awk '{print$1}'; }
 toUpper() { args_to_stdin "$@" | perl -C -pe '$_=uc'; }
 toLower() { args_to_stdin "$@" | perl -C -pe '$_=lc'; }
-fromEpoch() { [[ $# -eq 0 && -t 0 ]] && return; local s=$(args_to_stdin "$@"); date -ud @"$s" -Iseconds; }
+fromEpoch() { [[ $# -eq 0 && -t 0 ]] && return; local s; s=$(args_to_stdin "$@"); date -ud @"$s" -Iseconds; }
 
 # ────────────────────────────────────────
 #  Web Recon

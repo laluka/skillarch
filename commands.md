@@ -26,6 +26,7 @@
 |base16to10|Convert Hex to Int (Base 16 → Base 10 - E7C2CB2B4C1 → 15926488642753)|
 |base2to10|Convert Bin to Int (Base 2 → Base 10 - 1110011111000010110010 → 3797170)|
 |batall|Show all files (sub-directories included) into bat|
+|batsh|bat with Bash/Zsh/Shell syntax color|
 |bc|Arbitrary precision calculator language|
 |bettercap|Swiss-army knife for MITM / network attacks|
 |bison|YACC-compatible parser generator|
@@ -183,6 +184,7 @@
 |git-clone-all-gitlab|Clone all owned GitLab repos|
 |git-pull-all|`git pull` in all subdirs (parallel)|
 |gitleaks|Detect secrets / passwords in git repos|
+|gst|`git status --short`|
 |glow|Render Markdown in the terminal|
 |go|The Go programming language toolchain|
 |gobypass403|403 Bypass scanner|
@@ -302,7 +304,7 @@
 |sha1|SHA1 Hash|
 |sha256|SHA256 Hash|
 |show-disk-io|`watch iostat -h`|
-|show-open-ports|Show TCP Open ports (Listen mode)|
+|show-open-ports|Show all listening ports (TCP + UDP)|
 |shuffledns|DNS brute-forcer with resolver shuffling|
 |signal-desktop|Encrypted messaging desktop app|
 |ska|`cd /opt/skillarch`|
@@ -318,7 +320,7 @@
 |skao|`cd /opt/skillarch-original`|
 |sns|AWS SNS notification exploitation tool|
 |socat|Multipurpose relay (SOcket CAT)|
-|sop|Show TCP Open ports (Listen mode)|
+|sop|Show all listening ports (TCP + UDP)|
 |sortn|`sort -V \| uniq -c \| sort -n`|
 |spf|Pretty terminal file manager (superfile)|
 |sqlite3|Command-line interface for SQLite|
@@ -374,6 +376,12 @@
 |utf16to8|Encode UTF16-LE to UTF-8|
 |utf8toLatin|Convert UTF-8 to Latin-1|
 |uv|Ultra-fast Python package and project manager|
+|uva|`uv add --script` (Update a script with a lib (mytool.py added_lib) or w/ requirements.txt (mytool.py -r requirements.txt))|
+|uvp|`uv pip install`|
+|uvreq|`uv pip install -r requirements.txt`|
+|uvpwn|`uvx --with pwntools python` (Run a python script using pwn lib)|
+|uvr|`uv run`|
+|uvv|`uv venv .venv && source .venv/bin/activate`|
 |v|nvim|
 |vbindiff|Visual binary diff tool|
 |veracrypt|Disk encryption (GUI + CLI)|
