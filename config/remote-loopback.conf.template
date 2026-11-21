@@ -1,0 +1,40 @@
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+# Accept browser requests from this endpoint and direct clients with no Origin.
+map "$http_origin|$http_host" $allowed_origin {
+    default 0;
+    ~^\| 1;
+    ~^http://([^|]+)\|\1$ 1;
+}
+
+server {
+    listen 8080 default_server;
+    absolute_redirect off;
+
+    if ($host !~ "^(localhost|127\.0\.0\.1)$") { return 403; }
+    if ($allowed_origin = 0) { return 403; }
+
+    location = / { return 302 /guacamole/; }
+
+    # Guacamole's token endpoint still creates the browser session. Supply
+    # the generated backend credentials here, outside the browser.
+    location = /guacamole/api/tokens {
+        limit_except POST { deny all; }
+        proxy_pass http://browser:8080;
+        proxy_set_header Content-Type application/x-www-form-urlencoded;
+        proxy_set_body "username=hacker&password=${SKA_REMOTE_PASSWORD}";
+    }
+
+    location /guacamole/ {
+        proxy_pass http://browser:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+    }
+}

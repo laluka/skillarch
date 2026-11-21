@@ -8,7 +8,7 @@
 
 - **OS**: CachyOS (Arch Linux, performance-tuned)
 - **Shell**: Zsh + Oh-My-Zsh + Powerlevel10k (`af-magic` theme)
-- **WM/DE**: i3-gaps (local X11) + KDE Plasma (local Wayland) + Xfce (KasmVNC remote desktop)
+- **WM/DE**: i3-gaps (local X11) + KDE Plasma (Wayland, local or browser remote desktop)
 - **Editors**: Neovim (LazyVim), VS Code (`code`)
 - **Install root**: `/opt/skillarch/` — all dotfiles symlinked from here
 - **Data root**: `/DATA/` — long-lived user data
@@ -25,13 +25,14 @@ make install-base       # Repo setup, pacman config, chaotic-aur, /DATA dir
 make install-cli-tools  # CLI tools, mise runtimes (Python/Node/Go/Rust), uv tools, neovim+LazyVim
 make install-shell      # Zsh, oh-my-zsh, fzf, tmux, vim, dotfile symlinks
 make install-docker     # Docker + Docker Compose, user added to docker group
-make install-gui        # i3, KDE Plasma, Xfce for KasmVNC, and GUI/touchpad config
+make install-gui        # i3, KDE Plasma, and GUI/touchpad config
+make install-remote-desktop # KRDP, PipeWire, and WirePlumber for the full Docker image
 make install-gui-tools  # Chrome, VSCode, Ghidra, Discord, VLC, Wireshark
 make install-offensive  # Metasploit, ffuf, pdtm tools, go binaries, GitHub releases, cloned tools
 make install-wordlists  # All wordlists to /opt/lists/
 make install-hardening  # opensnitch (installed, opt-in)
 make update             # git pull + prompt to re-run make install
-make cloud              # (Standalone, NOT in make install) KasmVNC + cloud-init for cloud/remote desktop
+make cloud              # (Standalone, NOT in make install) cloud-init and SSH
 make test               # Full smoke tests
 make test-lite          # Lite Docker image smoke tests
 make test-full          # Full Docker image smoke tests (GUI + wordlists)
@@ -42,6 +43,8 @@ make docker-build       # Build thelaluka/skillarch:lite locally
 make docker-build-full  # Build thelaluka/skillarch:full locally
 make docker-run         # Run lite container (--net=host, /tmp volume)
 make docker-run-full    # Run full container with X11 socket (GUI)
+make docker-run-remote  # Run full container with the Plasma browser desktop
+make docker-stop-remote # Remove the browser desktop containers and session state
 make clean              # Docker-only: clear caches (pacman, yay, pip, mise, go, npm, logs)
 ```
 
@@ -60,7 +63,7 @@ make clean              # Docker-only: clear caches (pacman, yay, pip, mise, go,
 | `ska-update-simple` | `ska && make update && make install` |
 | `ska-update-advanced` | Interactive upstream-merge for forks (commit local → fetch → preview → merge → push → reapply, all Y/n-prompted) |
 | `ska-sudo-unlock` | Reset faillock after 3 bad sudo attempts |
-| `ska-vnc` | Start a mouse/touch-friendly Xfce desktop in KasmVNC on :1 |
+| `ska-remote` | Start the full Docker image's Plasma desktop in a browser |
 | `ska-vbox-install-guestutils` | Install VirtualBox guest utils |
 | `fastfetch` / `neofetch` / `hifetch` | fastfetch with SkillArch logo |
 
@@ -311,7 +314,7 @@ make clean              # Docker-only: clear caches (pacman, yay, pip, mise, go,
 ## Installed Tools
 
 ### GUI / Desktops (pacman)
-`i3-wm`, `polybar`, `rofi`, `picom`, `kitty`, `plasma-meta` (Wayland), `xfce4-session`, `xfce4-panel`, `xfdesktop`, `xfwm4` (KasmVNC X11 desktop)
+`i3-wm`, `polybar`, `rofi`, `picom`, `kitty`, `plasma-meta` (Wayland). The full Docker image also installs `krdp`, `pipewire`, `wireplumber`, `xorg-xwayland`, and `mesa` via pacman for remote Plasma sessions.
 
 ### CLI & Productivity (pacman)
 `bat`, `eza`, `fzf`, `ripgrep`, `fd`, `jq`, `glow`, `jless`, `gron`, `htmlq`, `qsv`, `viu`, `superfile`, `fastfetch`, `asciinema`, `bottom`, `htop`, `tmux`, `git-delta`, `lazygit`, `fq`, `fx`, `websocat`, `cloc`, `tree`, `rlwrap`, `parallel`, `tmate`, `trash-cli`, `sysstat`, `inotify-tools`
@@ -379,29 +382,7 @@ All services below are **disabled/stopped by default** unless noted:
 | `opensnitchd` | disabled (opt-in) | `sudo systemctl start opensnitchd` | Egress firewall |
 ### Cloud Target (`make cloud` — standalone, NOT part of `make install`)
 
-Installs KasmVNC (`kasmvncserver-bin`) + `openssl-1.1` (AUR, required — KasmVNC binary is linked against libssl.so.1.1).
-
-| Service | Status | Start | Purpose |
-|---|---|---|---|
-| *(user-level)* | not installed by default | `ska-vnc` or `kasmvncserver :1` | KasmVNC Xfce remote desktop (yay: `kasmvncserver-bin`) |
-
-#### KasmVNC Usage
-TLS uses the self-signed certificate created by `make cloud`. The server is bound to localhost and `ska-vnc` disables basic authentication, so access it through an SSH port-forward only.
-
-Plasma 6.8 is Wayland-only, while KasmVNC provides an X server. The VNC startup script therefore launches Xfce, providing a conventional panel, application menu, desktop, settings UI, and window controls suited to remote and mobile use.
-
-```bash
-# Quick start (no auth, localhost only):
-ska-vnc
-# Or manual setup:
-kasmvncpasswd -u $USER -w -r
-kasmvncserver :1 -config ~/.vnc/kasmvnc.yaml
-# From your local machine, SSH port-forward:
-ssh -L 8443:localhost:8443 user@host
-# Access: https://localhost:8443
-# Stop server
-kasmvncserver -kill :1
-```
+Configures cloud-init and SSH. The full Docker image provides an opt-in 1920×1080 Plasma Wayland desktop via KRDP and Guacamole, bound to host loopback. See [Plasma browser desktop in Docker](readme.md#plasma-browser-desktop-in-docker) for the `/dev/udmabuf` requirement, start/stop commands, and SSH tunneling.
 
 ---
 
@@ -422,7 +403,6 @@ All configs live in `/opt/skillarch/config/` and are symlinked into `$HOME`:
 | `~/.config/picom.conf` | `config/picom.conf` |
 | `~/.config/rofi/config.rasi` | `config/rofi/config.rasi` |
 | `~/.config/flameshot/flameshot.ini` | `config/flameshot/flameshot.ini` |
-| `~/.vnc/kasmvnc.yaml` | `config/kasmvnc.yaml` |
 | `/etc/X11/xorg.conf.d/30-touchpad.conf` | `config/xorg.conf.d/30-touchpad.conf` |
 
 ---

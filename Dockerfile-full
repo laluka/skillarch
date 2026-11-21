@@ -12,6 +12,7 @@ WORKDIR /opt/skillarch
 # Install all targets in a single layer so clean reclaims space within the same layer
 RUN make install-docker && \
     make install-gui && \
+    make install-remote-desktop && \
     make install-gui-tools && \
     make install-wordlists && \
     make install-hardening && \

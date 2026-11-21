@@ -40,8 +40,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+      - name: Build and smoke-test lite and full
+        run: make docker-build-full
 
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main'
@@ -50,29 +50,18 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push lite
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile-lite
-          push: ${{ github.ref == 'refs/heads/main' }}
-          secrets: |
-            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/skillarch:latest
-            ${{ env.DOCKERHUB_USERNAME }}/skillarch:lite
-            ${{ env.DOCKERHUB_USERNAME }}/skillarch:lite-${{ github.sha }}
-
-      - name: Build and Push full
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile-full
-          push: ${{ github.ref == 'refs/heads/main' }}
-          tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/skillarch:latest
-            ${{ env.DOCKERHUB_USERNAME }}/skillarch:full
-            ${{ env.DOCKERHUB_USERNAME }}/skillarch:full-${{ github.sha }}
+      - name: Publish tested images
+        if: github.ref == 'refs/heads/main'
+        run: |
+          image="$DOCKERHUB_USERNAME/skillarch"
+          for variant in lite full; do
+            docker tag "thelaluka/skillarch:$variant" "$image:$variant"
+            docker tag "$image:$variant" "$image:$variant-$GITHUB_SHA"
+            docker push "$image:$variant-$GITHUB_SHA"
+            docker push "$image:$variant"
+          done
+          docker tag "$image:full" "$image:latest"
+          docker push "$image:latest"
 
   semgrep:
     name: semgrep

@@ -1,7 +1,7 @@
 .ONESHELL:
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -c
-.PHONY: help install sanity-check install-base install-cli-tools install-shell install-docker install-gui install-gui-tools install-offensive install-wordlists install-hardening cloud cloud-export update docker-build docker-build-full docker-run docker-run-full clean test test-lite test-full doctor list-tools backup
+.PHONY: help install sanity-check install-base install-cli-tools install-shell install-docker install-gui install-gui-tools install-remote-desktop install-offensive install-wordlists install-hardening cloud cloud-export update docker-build docker-build-full docker-run docker-run-full docker-run-remote docker-stop-remote clean test test-lite test-full doctor list-tools backup
 
 # -- Colors & UX Helpers --
 C_RST   := \033[0m
@@ -87,7 +87,7 @@ install-base: sanity-check ## Install base packages
 	# Clean up, Update, Basics
 	sudo sed -e "s#.*ParallelDownloads.*#ParallelDownloads = 10#g" -i /etc/pacman.conf
 	$(call ska-pacman-sandbox)
-	echo 'BUILDDIR="/dev/shm/makepkg"' | sudo tee /etc/makepkg.conf.d/00-skillarch.conf
+	[[ -f /.dockerenv ]] || echo 'BUILDDIR="/dev/shm/makepkg"' | sudo tee /etc/makepkg.conf.d/00-skillarch.conf
 	[[ ! -f /.dockerenv ]] && sudo cachyos-rate-mirrors || true # Increase install speed & Update repos (skip in Docker)
 
 	# Init keyring only if needed
@@ -202,14 +202,12 @@ install-docker: sanity-check ## Install Docker & Docker Compose
 	[[ ! -f /.dockerenv ]] && sudo systemctl enable --now docker || true
 	$(call DONE,Docker installed!)
 
-install-gui: sanity-check ## Install i3, KDE Plasma, and Xfce for KasmVNC
+install-gui: sanity-check ## Install i3 and KDE Plasma
 	$(call INFO,Installing GUI & window manager...)
 	[[ ! -f /etc/machine-id ]] && sudo systemd-machine-id-setup || true
 	$(PACMAN_INSTALL) xorg-server cachyos-kde-settings plasma-meta i3-gaps i3blocks i3lock i3lock-fancy-git i3status dmenu feh rofi nm-connection-editor picom polybar kitty brightnessctl xorg-xhost
 	# Plasma 6.8 is Wayland-only; i3 remains the local tiling X11 session
 	$(PACMAN_INSTALL) plasma-desktop konsole alacritty
-	# Mouse/touch-friendly X11 desktop for KasmVNC remote and mobile sessions
-	$(PACMAN_INSTALL) xfce4-appfinder xfce4-panel xfce4-session xfce4-settings xfce4-terminal xfdesktop xfwm4 thunar thunar-volman tumbler
 	yay --noconfirm --needed -S rofi-power-menu i3-battery-popup-git
 	# -- KDE Dark Theme (BreezeDark) --
 	# plasma-apply-colorscheme needs a running Plasma session (D-Bus); during install
@@ -389,29 +387,17 @@ install-hardening: sanity-check ## Install hardening tools (opensnitch)
 	# sudo systemctl enable --now opensnitchd.service
 	$(call DONE,Hardening tools installed!)
 
-cloud: sanity-check ## (Standalone) Install KasmVNC + cloud-init for cloud/remote desktop - NOT part of make install
-	$(call INFO,Installing cloud/remote desktop tools...)
+install-remote-desktop: sanity-check ## Install Plasma's RDP server and capture dependencies
+	$(PACMAN_INSTALL) krdp pipewire wireplumber xorg-xwayland mesa
+	# Docker drops CAP_SYS_NICE. A file capability still requesting it causes
+	# the kernel to refuse execution of KWin under the default container policy.
+	if [[ -f /.dockerenv && -n "$$(getcap /usr/bin/kwin_wayland)" ]]; then
+		sudo setcap -r /usr/bin/kwin_wayland
+	fi
+	$(call DONE,Remote desktop tools installed!)
 
-	# -- KasmVNC --
-	# openssl-1.1: KasmVNC binary is linked against libssl.so.1.1
-	yay --noconfirm --needed -S openssl-1.1 || $(call WARN,Failed to install openssl-1.1$(comma) continuing...)
-	# KasmVNC: browser-based VNC remote desktop (per-user, no systemd daemon)
-	yay --noconfirm --needed -S kasmvncserver-bin || $(call WARN,Failed to install kasmvncserver-bin$(comma) continuing...)
-
-	# -- KasmVNC config --
-	mkdir -p ~/.vnc
-	$(call ska-link,/opt/skillarch/config/kasmvnc.yaml,$$HOME/.vnc/kasmvnc.yaml)
-	$(call ska-link,/opt/skillarch/config/vnc-xstartup,$$HOME/.vnc/xstartup)
-	# Self-signed SSL cert (one-time)
-	[[ ! -f ~/.vnc/self.pem ]] && openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-		-keyout ~/.vnc/self.key -out ~/.vnc/self.pem -subj "/CN=vnc" 2>/dev/null && chmod 600 ~/.vnc/self.key || true
-	# Dummy kasmpasswd - KasmVNC refuses to start without one; -DisableBasicAuth makes it unused.
-	# Password MUST be >= 6 chars or kasmvncpasswd silently fails.
-	[[ ! -f ~/.kasmpasswd ]] && echo -e "kasmvnc\nkasmvnc" | kasmvncpasswd -u dummy -w -ow ~/.kasmpasswd 2>/dev/null && chmod 600 ~/.kasmpasswd || true
-	# Mark DE as already selected - xstartup is pre-configured; skips interactive DE picker
-	touch ~/.vnc/.de-was-selected
-	# Polkit: allow wheel group to act without password - VNC sessions have no local seat for polkit prompts
-	sudo tee /etc/polkit-1/rules.d/49-nopasswd-wheel.rules > /dev/null <<< 'polkit.addRule(function(action, subject) { if (subject.isInGroup("wheel")) { return polkit.Result.YES; } });'
+cloud: sanity-check ## (Standalone) Configure cloud-init and SSH for a cloud VM
+	$(call INFO,Installing cloud VM tools...)
 
 	# -- tmux: cloud theme (dark purple-blue status bar) --
 	sed -i "s|^set-option -g status-bg.*|set-option -g status-bg '#1e1e2e'  # deep dark purple-blue|" /opt/skillarch/config/tmux.conf
@@ -454,7 +440,7 @@ cloud: sanity-check ## (Standalone) Install KasmVNC + cloud-init for cloud/remot
 	$(call INFO,Deleting all Snapper snapshots...)
 	sudo snapper delete $$(sudo snapper list --columns number | tail -n +4 | tr -d ' ' | tr '\n' ' ') 2>/dev/null || true
 
-	$(call DONE,Cloud tools installed! Start KasmVNC with: ska-vnc)
+	$(call DONE,Cloud tools installed! Use make docker-run-remote for the browser desktop)
 
 cloud-export: ## Export a libvirt VM to a clean qcow2 (for Proxmox/DO import)
 	@$(call INFO,Scanning libvirt VMs via virsh...)
@@ -651,9 +637,11 @@ test-full: test ## Validate full Docker image install (runs test + extras)
 		fi || true
 	}
 	$(call BOLD,\n--- GUI Binaries ---)
-	for bin in i3 kitty polybar rofi picom code startxfce4; do
+	for bin in i3 kitty polybar rofi picom code startplasma-wayland krdpserver pipewire wireplumber; do
 		ska_check "$$bin" "which $$bin"
 	done
+	ska_check "remote desktop launcher" "bash -n /opt/skillarch/config/remote-desktop"
+	ska_check "KWin startup" "kwin_wayland --version"
 	$(call BOLD,\n--- GUI Config Symlinks ---)
 	ska_check "i3 config"      "[[ -L ~/.config/i3/config ]]"
 	ska_check "polybar config" "[[ -L ~/.config/polybar/config.ini ]]"
@@ -787,11 +775,13 @@ backup: ## Backup current configs before overwriting
 # Docker Targets
 # ============================================================
 
+DOCKER_PLATFORM ?= linux/amd64
+
 docker-build: ## Build lite Docker image locally
-	docker build -t thelaluka/skillarch:lite -f Dockerfile-lite .
+	docker build --platform $(DOCKER_PLATFORM) -t thelaluka/skillarch:lite -f Dockerfile-lite .
 
 docker-build-full: docker-build ## Build full Docker image locally
-	docker build -t thelaluka/skillarch:full -f Dockerfile-full .
+	docker build --platform $(DOCKER_PLATFORM) -t thelaluka/skillarch:full -f Dockerfile-full .
 
 docker-run: ## Run lite Docker image locally
 	sudo docker run --rm -it --name=ska --net=host -v /tmp:/tmp thelaluka/skillarch:lite
@@ -799,6 +789,17 @@ docker-run: ## Run lite Docker image locally
 docker-run-full: ## Run full Docker image locally
 	xhost +
 	sudo docker run --rm -it --name=ska --net=host -v /tmp:/tmp -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ --privileged thelaluka/skillarch:full
+
+docker-run-remote: ## Run the full image's Plasma desktop in a browser
+	ska_password=$$(docker compose -f compose.remote.yml exec -T desktop printenv SKA_REMOTE_PASSWORD 2>/dev/null | grep -m1 -Ex '[0-9a-f]{32,64}' || openssl rand -hex 24) && \
+	ska_gid=$$(docker run --rm --pull=never --platform $(DOCKER_PLATFORM) \
+		--device=/dev/udmabuf:/dev/udmabuf:rw --entrypoint stat thelaluka/skillarch:full -c '%g' /dev/udmabuf) && \
+	SKA_REMOTE_PASSWORD=$$ska_password SKA_RENDER_GID=$$ska_gid SKA_DOCKER_PLATFORM=$(DOCKER_PLATFORM) \
+		docker compose -f compose.remote.yml up -d --wait && \
+	$(call DONE,Open http://localhost:8080/guacamole/)
+
+docker-stop-remote: ## Remove the browser desktop containers and session state
+	docker compose -f compose.remote.yml down
 
 # ============================================================
 # Cleanup

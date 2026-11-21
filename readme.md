@@ -84,12 +84,13 @@ make help
 #   install-cli-tools   Install CLI tools & runtimes
 #   install-shell       Install shell, zsh, oh-my-zsh, fzf, tmux
 #   install-docker      Install Docker & Docker Compose
-#   install-gui         Install i3, KDE Plasma, and Xfce for KasmVNC
+#   install-gui         Install i3 and KDE Plasma
+#   install-remote-desktop  Install Plasma's RDP server and capture dependencies
 #   install-gui-tools   Install GUI apps (Chrome, VSCode, Ghidra, etc.)
 #   install-offensive   Install offensive & security tools
 #   install-wordlists   Install wordlists (SecLists, rockyou, etc.)
 #   install-hardening   Install hardening tools (opensnitch)
-#   cloud               (Standalone) Install KasmVNC + cloud-init for cloud/remote desktop (NOT part of make install)
+#   cloud               (Standalone) Configure cloud-init and SSH for a cloud VM
 #   cloud-export        Export a libvirt VM to a clean qcow2 (for Proxmox/DO import)
 #   update              Update SkillArch (pull & prompt reinstall)
 #   test                Validate installation (smoke tests)
@@ -102,6 +103,8 @@ make help
 #   docker-build-full   Build full Docker image locally
 #   docker-run          Run lite Docker image locally
 #   docker-run-full     Run full Docker image locally
+#   docker-run-remote   Run the full image's Plasma desktop in a browser
+#   docker-stop-remote  Remove the browser desktop containers and session state
 #   clean               Clean up system and remove unnecessary files
 ```
 
@@ -119,7 +122,7 @@ make help
 | `ska-sudo-unlock` | Unlock current user after 3 sudo fails |
 | `ska-update-simple` | Update SkillArch repo & starts install |
 | `ska-update-advanced` | Interactive upstream-merge for forks (prompts at each step) |
-| `ska-vnc` | Start a click-friendly Xfce desktop via KasmVNC (browser at https://127.0.0.1:8443) |
+| `ska-remote` | Start the full Docker image's Plasma desktop in a browser |
 
 ### MISC Gotchas
 
@@ -165,7 +168,7 @@ wget --continue --user-agent='Mozilla/5.0 (X11; Linux x86_64)' "$BASE/$LATEST"
 echo "Downloaded: $LATEST"
 ```
 
-- Image is built from the cloud target (`make cloud`); KasmVNC + cloud-init + SSH already wired.
+- The cloud target (`make cloud`) configures cloud-init and SSH. Use the Docker browser desktop below for graphical access.
 - BIOS boot (not UEFI); import works everywhere without firmware fiddling.
 - Default user: `hacker`, password: `skillarch` ⚠️ **change it on first boot** (`passwd`) -- the image ships with a known password for convenience, do NOT expose it to the internet without changing it first.
 - Passwordless sudo enabled (cloud-init).
@@ -334,13 +337,10 @@ bindsym $mod+c exec code
 
 ```bash
 # Pacman Packages
-arandr asciinema base-devel bat bettercap bison blueman bore bottom brightnessctl bzip2 ca-certificates cachyos-kde-settings cloc cmake visual-studio-code-bin curl discord dmenu docker docker-compose dos2unix dragon-drop-git dunst emote eza expect fastfetch feh ffmpeg filezilla flameshot foremost fq fx gdb ghex ghidra git git-delta gitleaks glow gnupg google-chrome gparted gron guvcview hashcat htmlq htop hwinfo xorg-server i3-gaps i3blocks i3lock i3lock-fancy-git i3status icu inotify-tools iproute2 jless jq kdenlive kitty kompare lazygit libedit libffi libjpeg-turbo libpcap libpng libreoffice-fresh libxml2 libzip llvm lsof ltrace make meld metasploit mise mlocate mplayer ncurses neovim net-tools ngrep nm-connection-editor nmap okular opencode opensnitch openssh openssl parallel perl-image-exiftool php-gd picom pkgconf plasma-meta polybar postgresql-libs python-virtualenv qbittorrent re2c readline ripgrep rlwrap rofi signal-desktop socat sqlite sshpass superfile sysstat tmate tmux tor torbrowser-launcher traceroute trash-cli tree unzip vbindiff veracrypt vim viu vlc vlc-plugin-ffmpeg flatpak websocat wget wireshark-qt xclip qsv xfce4-appfinder xfce4-panel xfce4-session xfce4-settings xfce4-terminal xfdesktop xfwm4 xz yay zip zsh zsh-autosuggestions zsh-completions zsh-history-substring-search zsh-syntax-highlighting zsh-theme-powerlevel10k cronie tree-sitter audacity xorg-xhost archlinux-keyring jdk21-openjdk polkit-kde-agent kamoso plasma-desktop konsole alacritty thunar thunar-archive-plugin thunar-volman tumbler ffmpegthumbnailer gvfs gvfs-mtp file-roller
+arandr asciinema base-devel bat bettercap bison blueman bore bottom brightnessctl bzip2 ca-certificates cachyos-kde-settings cloc cmake visual-studio-code-bin curl discord dmenu docker docker-compose dos2unix dragon-drop-git dunst emote eza expect fastfetch feh ffmpeg filezilla flameshot foremost fq fx gdb ghex ghidra git git-delta gitleaks glow gnupg google-chrome gparted gron guvcview hashcat htmlq htop hwinfo xorg-server i3-gaps i3blocks i3lock i3lock-fancy-git i3status icu inotify-tools iproute2 jless jq kdenlive kitty kompare lazygit libedit libffi libjpeg-turbo libpcap libpng libreoffice-fresh libxml2 libzip llvm lsof ltrace make meld metasploit mise mlocate mplayer ncurses neovim net-tools ngrep nm-connection-editor nmap okular opencode opensnitch openssh openssl parallel perl-image-exiftool php-gd picom pkgconf plasma-meta polybar postgresql-libs python-virtualenv qbittorrent re2c readline ripgrep rlwrap rofi signal-desktop socat sqlite sshpass superfile sysstat tmate tmux tor torbrowser-launcher traceroute trash-cli tree unzip vbindiff veracrypt vim viu vlc vlc-plugin-ffmpeg flatpak websocat wget wireshark-qt xclip qsv krdp pipewire wireplumber xorg-xwayland mesa xz yay zip zsh zsh-autosuggestions zsh-completions zsh-history-substring-search zsh-syntax-highlighting zsh-theme-powerlevel10k cronie tree-sitter audacity xorg-xhost archlinux-keyring jdk21-openjdk polkit-kde-agent kamoso plasma-desktop konsole alacritty thunar thunar-archive-plugin thunar-volman tumbler ffmpegthumbnailer gvfs gvfs-mtp file-roller
 
 # Yay packages
 ffuf gau waybackurls fswebcam caido-desktop caido-cli i3-battery-popup-git rofi-power-menu fabric-ai-bin
-
-# Yay packages (cloud target only, not part of make install)
-openssl-1.1 kasmvncserver-bin
 
 # Flatpak packages
 com.obsproject.Studio
@@ -423,31 +423,23 @@ The following systemd services are installed but **disabled and stopped by defau
 | `opensnitchd` | `opensnitch` | `sudo systemctl start opensnitchd` | `sudo systemctl enable opensnitchd` | Egress firewall (opt-in) |
 ### Cloud Target (standalone -- `make cloud`)
 
-> **Not part of `make install`** -- this is a standalone target for cloud/remote desktop VMs.
-
-Installs KasmVNC + cloud-init + SSH. After `make install-gui` and `make cloud`, the `ska-vnc` alias starts a conventional Xfce desktop in KasmVNC's X11 server, accessible from a browser and comfortable with mouse or touch input. Plasma remains available as the local Wayland desktop, and i3 remains available locally.
+`make cloud` configures cloud-init and SSH. For graphical access on a cloud VM, start the Docker browser desktop on the VM and forward its loopback port with `ssh -L 8080:127.0.0.1:8080 user@host`.
 
 | Service | Package | Start | Purpose |
 |---------|---------|-------|---------|
-| *(user-level)* | `kasmvncserver-bin` | `ska-vnc` | Xfce desktop via browser (VNC over websocket) |
 | `sshd` | `openssh` | auto-enabled | SSH access |
 | `cloud-init` | `cloud-init` | auto-enabled | VM auto-config (network, SSH keys, hostname) |
 
-**Quick start:**
+#### Plasma browser desktop in Docker
+
+The full image can run a 1920×1080 Plasma Wayland session with the SkillArch wallpaper through KRDP and Guacamole. Both images start a shell by default. Local builds default to `linux/amd64`. The Linux Docker host (or its VM on macOS) needs `/dev/udmabuf` for software rendering. The start target handles its group permissions.
 
 ```bash
-ska-vnc
-# KasmVNC running on https://127.0.0.1:8443 (no auth)
-
-# From your local machine, SSH port-forward then open in browser:
-ssh -L 8443:localhost:8443 user@host
-# Access: https://localhost:8443
-
-# Stop:
-vncserver -kill :1
+make docker-build-full
+make docker-run-remote
 ```
 
-**How it works:** Plasma 6.8 no longer provides an X11 session, while KasmVNC provides an X server rather than a Wayland compositor. The `vnc-xstartup` script therefore starts Xfce for a familiar panel/menu/desktop workflow and forces software rendering for Qt/KDE applications because Xvnc has no GLX extension.
+Open [the browser desktop](http://localhost:8080/guacamole/). It opens Plasma directly, with no username or password prompt. The stack is off by default and starts in the background on host loopback. Run `make docker-stop-remote` to stop it and remove its writable session state. Anyone who can reach the loopback endpoint, including through an SSH tunnel, can control the desktop.
 
 ### Security
 
