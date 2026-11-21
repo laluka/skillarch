@@ -438,11 +438,10 @@ The full SkillArch image runs KWin's virtual display, PipeWire, and KDE Remote D
 
 ```bash
 make docker-build-full
-export SKA_REMOTE_PASSWORD="$(openssl rand -hex 16)"
 make docker-run-remote
 ```
 
-Open [the browser desktop](http://localhost:8080/guacamole/) and sign in as `hacker` with `SKA_REMOTE_PASSWORD`. The web UI listens only on host loopback. Press Ctrl+C to stop the stack, then run `make docker-stop-remote` to remove its containers and writable session state.
+Open [the browser desktop](http://localhost:8080/guacamole/). It opens Plasma directly, with no username or password prompt. The stack is off by default and starts in the background on host loopback. Run `make docker-stop-remote` to stop it and remove its writable session state. Anyone who can reach the loopback endpoint, including through an SSH tunnel, can control the desktop.
 
 ### Security
 

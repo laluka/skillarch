@@ -23,6 +23,8 @@ services:
 
   guacd:
     image: guacamole/guacd:1.6.0
+    healthcheck:
+      interval: 2s
 
   browser:
     image: guacamole/guacamole:1.6.0
@@ -31,8 +33,6 @@ services:
         condition: service_healthy
       guacd:
         condition: service_started
-    ports:
-      - "127.0.0.1:8080:8080"
     entrypoint: ["/bin/sh", "/opt/skillarch-remote-guacamole"]
     volumes:
       - ./config/remote-guacamole:/opt/skillarch-remote-guacamole:ro
@@ -40,3 +40,19 @@ services:
       GUACD_HOSTNAME: guacd
       GUACAMOLE_HOME: /tmp/skillarch-guac
       SKA_REMOTE_PASSWORD:
+
+  loopback:
+    image: nginx:1.30-alpine
+    depends_on: [browser]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./config/remote-loopback.conf.template:/etc/nginx/templates/default.conf.template:ro
+    environment:
+      SKA_REMOTE_PASSWORD:
+      NGINX_ENVSUBST_FILTER: ^SKA_REMOTE_PASSWORD$$
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/guacamole/"]
+      interval: 2s
+      timeout: 1s
+      retries: 30

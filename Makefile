@@ -791,11 +791,12 @@ docker-run-full: ## Run full Docker image locally
 	sudo docker run --rm -it --name=ska --net=host -v /tmp:/tmp -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ --privileged thelaluka/skillarch:full
 
 docker-run-remote: ## Run the full image's Plasma desktop in a browser
-	: "$${SKA_REMOTE_PASSWORD:?Set and export SKA_REMOTE_PASSWORD}" && \
+	ska_password=$$(docker compose -f compose.remote.yml exec -T desktop printenv SKA_REMOTE_PASSWORD 2>/dev/null | grep -m1 -Ex '[0-9a-f]{32,64}' || openssl rand -hex 24) && \
 	ska_gid=$$(docker run --rm --pull=never --platform $(DOCKER_PLATFORM) \
 		--device=/dev/udmabuf:/dev/udmabuf:rw --entrypoint stat thelaluka/skillarch:full -c '%g' /dev/udmabuf) && \
-	SKA_RENDER_GID=$$ska_gid SKA_DOCKER_PLATFORM=$(DOCKER_PLATFORM) \
-		docker compose -f compose.remote.yml up --abort-on-container-exit
+	SKA_REMOTE_PASSWORD=$$ska_password SKA_RENDER_GID=$$ska_gid SKA_DOCKER_PLATFORM=$(DOCKER_PLATFORM) \
+		docker compose -f compose.remote.yml up -d --wait && \
+	$(call DONE,Open http://localhost:8080/guacamole/)
 
 docker-stop-remote: ## Remove the browser desktop containers and session state
 	docker compose -f compose.remote.yml down

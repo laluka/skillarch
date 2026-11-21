@@ -385,13 +385,12 @@ All services below are **disabled/stopped by default** unless noted:
 Configures cloud-init and SSH. The full Docker image runs Plasma on KWin's virtual display and streams it through KRDP and Apache Guacamole. The Linux Docker daemon host needs `/dev/udmabuf`; Make discovers the device group inside Docker. The browser port is published on host loopback and the RDP service stays on the Compose network.
 
 ```bash
-export SKA_REMOTE_PASSWORD="$(openssl rand -hex 16)"
 make docker-run-remote  # after make docker-build-full
 # Local SSH tunnel for a cloud VM:
 ssh -L 8080:127.0.0.1:8080 user@host
 ```
 
-Open `http://localhost:8080/guacamole/` and sign in as `hacker` using `SKA_REMOTE_PASSWORD`. Ctrl+C stops the stack. `make docker-stop-remote` removes the stopped containers and writable session state.
+Open `http://localhost:8080/guacamole/` to enter Plasma directly without a login prompt. The stack is off by default and starts in the background on host loopback. `make docker-stop-remote` stops it and removes its writable session state. Loopback or SSH tunnel access grants desktop control.
 
 ---
 
