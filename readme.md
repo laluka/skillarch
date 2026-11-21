@@ -423,9 +423,7 @@ The following systemd services are installed but **disabled and stopped by defau
 | `opensnitchd` | `opensnitch` | `sudo systemctl start opensnitchd` | `sudo systemctl enable opensnitchd` | Egress firewall (opt-in) |
 ### Cloud Target (standalone -- `make cloud`)
 
-> **Not part of `make install`** -- this is a standalone target for cloud/remote desktop VMs.
-
-Configures cloud-init and SSH. For graphical access on a cloud VM, run the Docker browser desktop and forward its loopback port with `ssh -L 8080:127.0.0.1:8080 user@host`.
+`make cloud` configures cloud-init and SSH. For graphical access on a cloud VM, start the Docker browser desktop on the VM and forward its loopback port with `ssh -L 8080:127.0.0.1:8080 user@host`.
 
 | Service | Package | Start | Purpose |
 |---------|---------|-------|---------|
@@ -434,7 +432,7 @@ Configures cloud-init and SSH. For graphical access on a cloud VM, run the Docke
 
 #### Plasma browser desktop in Docker
 
-The full image runs Plasma Wayland with the SkillArch wallpaper and serves it through KRDP and Guacamole. Local builds default to `linux/amd64`. The Linux Docker host (or its VM on macOS) needs `/dev/udmabuf` for software rendering. The start target handles its group permissions.
+The full image can run a 1920×1080 Plasma Wayland session with the SkillArch wallpaper through KRDP and Guacamole. Both images start a shell by default. Local builds default to `linux/amd64`. The Linux Docker host (or its VM on macOS) needs `/dev/udmabuf` for software rendering. The start target handles its group permissions.
 
 ```bash
 make docker-build-full

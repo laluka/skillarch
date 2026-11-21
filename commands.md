@@ -337,7 +337,7 @@
 |ta|tmux attach|
 |te|trash-empty|
 |terraform|Infrastructure as Code tool|
-|thunar|Xfce file manager|
+|thunar|Graphical file manager used by SkillArch's i3 session|
 |tldfinder|TLD discovery tool for domain enumeration|
 |tlsx|TLS fingerprinting and probing|
 |tmate|Instant terminal sharing|

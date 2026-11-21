@@ -1,10 +1,7 @@
 FROM thelaluka/skillarch:lite
 
 USER root
-# Published lite images may configure AUR builds on /dev/shm, only 64 MiB in BuildKit.
-RUN touch /.dockerenv && \
-    rm -f /etc/makepkg.conf.d/00-skillarch.conf && \
-    echo "hacker ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/hacker
+RUN echo "hacker ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/hacker
 COPY . /opt/skillarch
 RUN chown -R hacker:hacker /opt/skillarch
 

@@ -382,7 +382,7 @@ All services below are **disabled/stopped by default** unless noted:
 | `opensnitchd` | disabled (opt-in) | `sudo systemctl start opensnitchd` | Egress firewall |
 ### Cloud Target (`make cloud` — standalone, NOT part of `make install`)
 
-Configures cloud-init and SSH. The full Docker image provides an opt-in Plasma Wayland desktop via KRDP and Guacamole, bound to host loopback. See [Plasma browser desktop in Docker](readme.md#plasma-browser-desktop-in-docker) for the `/dev/udmabuf` requirement, start/stop commands, and SSH tunneling.
+Configures cloud-init and SSH. The full Docker image provides an opt-in 1920×1080 Plasma Wayland desktop via KRDP and Guacamole, bound to host loopback. See [Plasma browser desktop in Docker](readme.md#plasma-browser-desktop-in-docker) for the `/dev/udmabuf` requirement, start/stop commands, and SSH tunneling.
 
 ---
 
