@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${SKA_REMOTE_PASSWORD:?Set SKA_REMOTE_PASSWORD before starting the desktop}"
+if [[ ${1:-} != --session ]]; then
+    if [[ ! -r /dev/udmabuf || ! -w /dev/udmabuf ]]; then
+        printf 'Plasma needs read/write access to /dev/udmabuf for headless rendering.\n' >&2
+        exit 1
+    fi
+    unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET DBUS_SESSION_BUS_ADDRESS XDG_SESSION_ID
+    XDG_RUNTIME_DIR=$(mktemp -d /tmp/skillarch-desktop.XXXXXXXX)
+    export XDG_RUNTIME_DIR
+    exec dbus-run-session -- bash "$0" --session
+fi
+
+runtime=$XDG_RUNTIME_DIR
+[[ $runtime == /tmp/skillarch-desktop.???????? && -O $runtime && ! -L $runtime ]]
+pids=()
+cleanup() {
+    if [[ ${#pids[@]} -gt 0 ]]; then
+        kill -- "${pids[@]}" 2>/dev/null || true
+        wait 2>/dev/null || true
+    fi
+    rm -rf -- "$runtime"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+mkdir "$runtime/bin"
+# Plasma's classic startup finds the wrapper on PATH. Its virtual output
+# uses Mesa's software renderer through the host's DMA-BUF device.
+printf '%s\n' '#!/bin/sh' \
+    'exec /usr/bin/kwin_wayland_wrapper --virtual --width 1920 --height 1080 --no-lockscreen "$@"' \
+    > "$runtime/bin/kwin_wayland_wrapper"
+chmod 700 "$runtime/bin/kwin_wayland_wrapper"
+export PATH="$runtime/bin:$PATH" KWIN_RENDER_NODES=/dev/udmabuf KWIN_COMPOSE=O2
+
+env -u SKA_REMOTE_PASSWORD pipewire &
+pids+=("$!")
+for ((attempt=0; attempt<50; attempt++)); do
+    [[ ! -S "$runtime/pipewire-0" ]] || break
+    sleep 0.2
+done
+[[ -S "$runtime/pipewire-0" ]] || { printf 'PipeWire did not start.\n' >&2; exit 1; }
+env -u SKA_REMOTE_PASSWORD wireplumber &
+pids+=("$!")
+
+env -u SKA_REMOTE_PASSWORD XDG_SESSION_TYPE=wayland setsid startplasma-wayland &
+pids+=("-$!")
+gdbus wait --session --timeout=60 org.kde.plasmashell
+
+openssl req -x509 -nodes -days 30 -newkey rsa:2048 -subj /CN=desktop \
+    -keyout "$runtime/rdp.key" -out "$runtime/rdp.crt" 2>/dev/null
+QT_QPA_PLATFORM=wayland WAYLAND_DISPLAY=wayland-1 XDG_SESSION_TYPE=wayland \
+    krdpserver --plasma --monitor 0 --address "${SKA_RDP_BIND:-127.0.0.1}" \
+    --username "$(id -un)" --password "$SKA_REMOTE_PASSWORD" \
+    --certificate "$runtime/rdp.crt" --certificate-key "$runtime/rdp.key" &
+pids+=("$!")
+wait -n

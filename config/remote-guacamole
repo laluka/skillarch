@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+: "${SKA_REMOTE_PASSWORD:?Set SKA_REMOTE_PASSWORD before starting the desktop}"
+umask 077
+mkdir -p "$GUACAMOLE_HOME"
+password=$(printf '%s' "$SKA_REMOTE_PASSWORD" | sed 's/\&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+printf '%s\n' '<user-mapping>' \
+    "<authorize username=\"hacker\" password=\"$password\">" \
+    '<connection name="SkillArch"><protocol>rdp</protocol>' \
+    '<param name="hostname">desktop</param><param name="port">3389</param>' \
+    '<param name="security">nla</param><param name="ignore-cert">true</param>' \
+    '<param name="username">${GUAC_USERNAME}</param>' \
+    '<param name="password">${GUAC_PASSWORD}</param>' \
+    '</connection></authorize></user-mapping>' > "$GUACAMOLE_HOME/user-mapping.xml"
+unset SKA_REMOTE_PASSWORD
+exec /opt/guacamole/bin/entrypoint.sh

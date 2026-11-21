@@ -1,0 +1,42 @@
+name: skillarch-remote
+
+services:
+  desktop:
+    image: thelaluka/skillarch:full
+    pull_policy: never
+    platform: "${SKA_DOCKER_PLATFORM:-linux/amd64}"
+    init: true
+    shm_size: 512mb
+    devices:
+      - /dev/udmabuf:/dev/udmabuf:rw
+    group_add:
+      - "${SKA_RENDER_GID:-0}"
+    entrypoint: ["/bin/bash", "/opt/skillarch/config/remote-desktop"]
+    environment:
+      SKA_REMOTE_PASSWORD:
+      SKA_RDP_BIND: 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "ss -H -ltn 'sport = :3389' | grep -q ."]
+      interval: 2s
+      timeout: 1s
+      retries: 35
+
+  guacd:
+    image: guacamole/guacd:1.6.0
+
+  browser:
+    image: guacamole/guacamole:1.6.0
+    depends_on:
+      desktop:
+        condition: service_healthy
+      guacd:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8080:8080"
+    entrypoint: ["/bin/sh", "/opt/skillarch-remote-guacamole"]
+    volumes:
+      - ./config/remote-guacamole:/opt/skillarch-remote-guacamole:ro
+    environment:
+      GUACD_HOSTNAME: guacd
+      GUACAMOLE_HOME: /tmp/skillarch-guac
+      SKA_REMOTE_PASSWORD:

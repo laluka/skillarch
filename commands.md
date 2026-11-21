@@ -224,7 +224,6 @@
 |jsonescape|`jsonescape '{"distrib": "SkillArch", "quote": "That'"'"'s awesome!"}'` → {\"distrib\": \"SkillArch\", \"quote\": \"That's awesome!\"}|
 |jsonunescape|`jsonunescape '{\"distrib\": \"SkillArch\", \"quote\": \"That'"'"'s awesome!\"}'` → {"distrib": "SkillArch", "quote": "That's awesome!"}|
 |kamoso|Webcam application (KDE)|
-|kasmvncserver|Stream Xfce desktop via browser|
 |katana|Next-gen crawling and spidering framework|
 |kdenlive|Non-linear video editor (KDE)|
 |killit|`sudo kill -KILL`|
@@ -316,7 +315,7 @@
 |ska-update-simple|`ska && make update && make install`|
 |ska-vbox-install|Install Virtualbox package|
 |ska-vbox-install-guestutils|Install VirtualBox guest utils|
-|ska-vnc|Start KasmVNC on :1 (no auth, localhost only)|
+|ska-remote|Start the full Docker image's Plasma desktop in a browser|
 |skao|`cd /opt/skillarch-original`|
 |sns|AWS SNS notification exploitation tool|
 |socat|Multipurpose relay (SOcket CAT)|
@@ -328,7 +327,7 @@
 |ssh|OpenSSH remote login client|
 |ssh-yolo|SSH ignoring host key checks|
 |sshpass|Non-interactive SSH password authentication|
-|startxfce4|Start the click-friendly Xfce desktop session|
+|startplasma-wayland|Start a KDE Plasma Wayland session|
 |subfinder|Passive subdomain discovery tool|
 |suc|`sort \| uniq -c \| sort -h`|
 |suq|sort -u|
@@ -338,7 +337,7 @@
 |ta|tmux attach|
 |te|trash-empty|
 |terraform|Infrastructure as Code tool|
-|thunar|Xfce file manager|
+|thunar|Standalone GTK file manager used by i3|
 |tldfinder|TLD discovery tool for domain enumeration|
 |tlsx|TLS fingerprinting and probing|
 |tmate|Instant terminal sharing|

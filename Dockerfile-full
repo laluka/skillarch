@@ -1,7 +1,10 @@
 FROM thelaluka/skillarch:lite
 
 USER root
-RUN echo "hacker ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/hacker
+# Published lite images may configure AUR builds on /dev/shm, only 64 MiB in BuildKit.
+RUN touch /.dockerenv && \
+    rm -f /etc/makepkg.conf.d/00-skillarch.conf && \
+    echo "hacker ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/hacker
 COPY . /opt/skillarch
 RUN chown -R hacker:hacker /opt/skillarch
 
@@ -12,6 +15,7 @@ WORKDIR /opt/skillarch
 # Install all targets in a single layer so clean reclaims space within the same layer
 RUN make install-docker && \
     make install-gui && \
+    make install-remote-desktop && \
     make install-gui-tools && \
     make install-wordlists && \
     make install-hardening && \

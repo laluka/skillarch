@@ -84,7 +84,7 @@ ska-update-advanced() {
 alias ska-vbox-install-guestutils='sudo pacman -S virtualbox-guest-utils && sudo usermod -aG vboxsf "$USER"'
 alias ska-vbox-install='sudo pacman -S virtualbox virtualbox-host-dkms && echo -e "\n\n\nNow reboot to load the vbox drivers"'
 alias ska-sudo-unlock='su -c "faillock --user $USER --reset"'
-alias ska-vnc='vncserver -kill :1 2>/dev/null; rm /tmp/.X11-unix/X1 /tmp/.X1-lock; vncserver :1 -geometry 1920x1080 -depth 24 -websocketPort 8443 -FrameRate 30 -interface 127.0.0.1 -DisableBasicAuth -cert ~/.vnc/self.pem -key ~/.vnc/self.key && echo "KasmVNC running on https://127.0.0.1:8443 (no auth)"'
+alias ska-remote='make -C /opt/skillarch docker-run-remote'
 alias fastfetch='/usr/bin/fastfetch --logo /opt/skillarch/assets/logo-round-hot.png --logo-width 50'
 alias neofetch='fastfetch'
 alias hifetch='fastfetch'

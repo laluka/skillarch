@@ -1,7 +1,8 @@
 FROM cachyos/cachyos:latest
 
 # Create hacker user and group, set password and configure sudo
-RUN groupadd hacker && \
+RUN touch /.dockerenv && \
+    groupadd hacker && \
     useradd -m -g hacker -s /bin/bash hacker && \
     echo "hacker ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/hacker
 
