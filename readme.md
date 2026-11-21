@@ -434,7 +434,7 @@ Configures cloud-init and SSH. For graphical access on a cloud VM, run the Docke
 
 #### Plasma browser desktop in Docker
 
-The full SkillArch image runs KWin's virtual display, PipeWire, and KDE Remote Desktop. Apache Guacamole connects to it over RDP on the Compose network. Local builds default to `linux/amd64`. The Linux Docker host (or its Linux VM on macOS) must provide `/dev/udmabuf` for software rendering. The Make target automatically grants the desktop container access to the device's group.
+The full image runs Plasma Wayland with the SkillArch wallpaper and serves it through KRDP and Guacamole. Local builds default to `linux/amd64`. The Linux Docker host (or its VM on macOS) needs `/dev/udmabuf` for software rendering. The start target handles its group permissions.
 
 ```bash
 make docker-build-full

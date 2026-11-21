@@ -6,7 +6,7 @@ Instructions for AI coding agents (Claude Code, Pi, OpenAI Codex, Cursor, OpenCo
 
 ## What SkillArch is
 
-Reproducible hacker workstation for CachyOS/Arch. One `make install` sets up dotfiles, shell, WM, dev runtimes, offensive tools, wordlists. Also ships two Docker images (`lite`, `full`) and a cloud target (`make cloud`, Plasma browser desktop + cloud-init).
+Reproducible hacker workstation for CachyOS/Arch. One `make install` sets up dotfiles, shell, WM, dev runtimes, offensive tools, wordlists. Also ships two Docker images (`lite`, `full`) and a cloud target (`make cloud`, cloud-init + SSH).
 
 ---
 

@@ -337,7 +337,7 @@
 |ta|tmux attach|
 |te|trash-empty|
 |terraform|Infrastructure as Code tool|
-|thunar|Standalone GTK file manager used by i3|
+|thunar|Xfce file manager|
 |tldfinder|TLD discovery tool for domain enumeration|
 |tlsx|TLS fingerprinting and probing|
 |tmate|Instant terminal sharing|

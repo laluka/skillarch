@@ -382,15 +382,7 @@ All services below are **disabled/stopped by default** unless noted:
 | `opensnitchd` | disabled (opt-in) | `sudo systemctl start opensnitchd` | Egress firewall |
 ### Cloud Target (`make cloud` — standalone, NOT part of `make install`)
 
-Configures cloud-init and SSH. The full Docker image runs Plasma on KWin's virtual display and streams it through KRDP and Apache Guacamole. The Linux Docker daemon host needs `/dev/udmabuf`; Make discovers the device group inside Docker. The browser port is published on host loopback and the RDP service stays on the Compose network.
-
-```bash
-make docker-run-remote  # after make docker-build-full
-# Local SSH tunnel for a cloud VM:
-ssh -L 8080:127.0.0.1:8080 user@host
-```
-
-Open `http://localhost:8080/guacamole/` to enter Plasma directly without a login prompt. The stack is off by default and starts in the background on host loopback. `make docker-stop-remote` stops it and removes its writable session state. Loopback or SSH tunnel access grants desktop control.
+Configures cloud-init and SSH. The full Docker image provides an opt-in Plasma Wayland desktop via KRDP and Guacamole, bound to host loopback. See [Plasma browser desktop in Docker](readme.md#plasma-browser-desktop-in-docker) for the `/dev/udmabuf` requirement, start/stop commands, and SSH tunneling.
 
 ---
 

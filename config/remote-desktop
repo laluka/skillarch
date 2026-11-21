@@ -3,10 +3,10 @@ set -euo pipefail
 
 : "${SKA_REMOTE_PASSWORD:?Set SKA_REMOTE_PASSWORD before starting the desktop}"
 if [[ ${1:-} != --session ]]; then
-    if [[ ! -r /dev/udmabuf || ! -w /dev/udmabuf ]]; then
+    [[ -r /dev/udmabuf && -w /dev/udmabuf ]] || {
         printf 'Plasma needs read/write access to /dev/udmabuf for headless rendering.\n' >&2
         exit 1
-    fi
+    }
     unset DISPLAY WAYLAND_DISPLAY WAYLAND_SOCKET DBUS_SESSION_BUS_ADDRESS XDG_SESSION_ID
     XDG_RUNTIME_DIR=$(mktemp -d /tmp/skillarch-desktop.XXXXXXXX)
     export XDG_RUNTIME_DIR
@@ -17,10 +17,8 @@ runtime=$XDG_RUNTIME_DIR
 [[ $runtime == /tmp/skillarch-desktop.???????? && -O $runtime && ! -L $runtime ]]
 pids=()
 cleanup() {
-    if [[ ${#pids[@]} -gt 0 ]]; then
-        kill -- "${pids[@]}" 2>/dev/null || true
-        wait 2>/dev/null || true
-    fi
+    kill -- "${pids[@]}" 2>/dev/null || true
+    wait
     rm -rf -- "$runtime"
 }
 trap cleanup EXIT
@@ -50,19 +48,15 @@ env -u SKA_REMOTE_PASSWORD XDG_SESSION_TYPE=wayland setsid startplasma-wayland &
 pids+=("-$!")
 gdbus wait --session --timeout=60 org.kde.plasmashell
 
-# Plasma can register its D-Bus service before creating the desktop.
-wallpaper=/opt/skillarch/assets/bg.jpg
+# Wait for the screen as well as the D-Bus service before setting its wallpaper.
 for ((attempt=0; attempt<20; attempt++)); do
-    if QT_QPA_PLATFORM=offscreen plasma-apply-wallpaperimage "$wallpaper" >/dev/null 2>&1 &&
-        [[ $(gdbus call --session --timeout 2 --dest org.kde.plasmashell --object-path /PlasmaShell \
-            --method org.kde.PlasmaShell.wallpaper 0 2>/dev/null) == *"file://$wallpaper"* ]]; then
+    if gdbus call --session --timeout 2 --dest org.kde.plasmashell --object-path /PlasmaShell \
+        --method org.kde.PlasmaShell.wallpaper 0 2>/dev/null | grep -q wallpaperPlugin; then
         break
     fi
     sleep 0.25
 done
-if ((attempt == 20)); then
-    printf 'Could not apply the SkillArch wallpaper.\n' >&2
-fi
+QT_QPA_PLATFORM=offscreen plasma-apply-wallpaperimage /opt/skillarch/assets/bg.jpg || true
 
 openssl req -x509 -nodes -days 30 -newkey rsa:2048 -subj /CN=desktop \
     -keyout "$runtime/rdp.key" -out "$runtime/rdp.crt" 2>/dev/null
