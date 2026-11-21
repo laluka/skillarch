@@ -449,6 +449,19 @@ vncserver -kill :1
 
 **How it works:** Plasma 6.8 no longer provides an X11 session, while KasmVNC provides an X server rather than a Wayland compositor. The `vnc-xstartup` script therefore starts Xfce for a familiar panel/menu/desktop workflow and forces software rendering for Qt/KDE applications because Xvnc has no GLX extension.
 
+#### Experimental browser desktop: KDE Plasma on Wayland
+
+This standalone Docker Compose experiment uses [Selkies](https://github.com/selkies-project/docker-selkies-egl-desktop) to stream a headless Plasma Wayland session over a single HTTPS port. The pinned Ubuntu image ships Plasma 6.6.6, uses software rendering in this configuration, and downloads about 2.4 GiB on ARM64. Use it to evaluate the desktop and browser experience. Testing Plasma 6.8 on CachyOS with the SkillArch tools, dotfiles, and `/DATA` would need a separate integration pass.
+
+```bash
+export SKA_KDE_PASSWORD="$(openssl rand -hex 16)"
+docker compose -f compose.kde-experiment.yml up -d
+```
+
+Open <https://localhost:8444> and sign in as `ubuntu` with the generated password (`printenv SKA_KDE_PASSWORD`). Selkies generates a self-signed certificate. For a remote Docker host, forward its loopback port with `ssh -L 8444:127.0.0.1:8444 user@host` and open the same URL locally.
+
+Open Konsole and run `printenv WAYLAND_DISPLAY` to check the session. Try the application menu, browser resizing, clipboard, and touch input before comparing it with the Xfce session. Use `docker compose -f compose.kde-experiment.yml down` to remove the test container and its session state.
+
 ### Security
 
 - `opensnitch` is here to help you block outgoing packets and connections (opt-in, start manually)

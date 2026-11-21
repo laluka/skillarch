@@ -1,0 +1,13 @@
+name: skillarch-kde-experiment
+
+services:
+  desktop:
+    image: ghcr.io/selkies-project/selkies-egl-desktop:26.04@sha256:cee92447ae1445c0af4c26a73e32caa7d7cf31aed51b5c5e6549d94cc8fa8c9e
+    shm_size: 2gb
+    ports:
+      - "127.0.0.1:8444:8080"
+    environment:
+      PASSWD: "${SKA_KDE_PASSWORD:?Set SKA_KDE_PASSWORD in your shell}"
+      SELKIES_WAYLAND: "true"
+      SELKIES_WAYLAND_X11_FALLBACK: "false"
+      SELKIES_MODE: websockets
