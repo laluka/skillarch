@@ -50,6 +50,20 @@ env -u SKA_REMOTE_PASSWORD XDG_SESSION_TYPE=wayland setsid startplasma-wayland &
 pids+=("-$!")
 gdbus wait --session --timeout=60 org.kde.plasmashell
 
+# Plasma can register its D-Bus service before creating the desktop.
+wallpaper=/opt/skillarch/assets/bg.jpg
+for ((attempt=0; attempt<20; attempt++)); do
+    if QT_QPA_PLATFORM=offscreen plasma-apply-wallpaperimage "$wallpaper" >/dev/null 2>&1 &&
+        [[ $(gdbus call --session --timeout 2 --dest org.kde.plasmashell --object-path /PlasmaShell \
+            --method org.kde.PlasmaShell.wallpaper 0 2>/dev/null) == *"file://$wallpaper"* ]]; then
+        break
+    fi
+    sleep 0.25
+done
+if ((attempt == 20)); then
+    printf 'Could not apply the SkillArch wallpaper.\n' >&2
+fi
+
 openssl req -x509 -nodes -days 30 -newkey rsa:2048 -subj /CN=desktop \
     -keyout "$runtime/rdp.key" -out "$runtime/rdp.crt" 2>/dev/null
 QT_QPA_PLATFORM=wayland WAYLAND_DISPLAY=wayland-1 XDG_SESSION_TYPE=wayland \
