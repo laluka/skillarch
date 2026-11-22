@@ -397,6 +397,12 @@ install-remote-desktop: sanity-check ## Install Plasma's RDP server and capture 
 	fi
 	$(call DONE,Remote desktop tools installed!)
 
+# Apply only while creating a fresh image, before the operator chooses a password.
+.PHONY: image-passwords
+image-passwords:
+	@printf '%s\n' 'hacker:offenskill' | chpasswd
+	usermod --password '!' root
+
 cloud: sanity-check ## (Standalone) Configure cloud-init and SSH for a cloud VM
 	$(call INFO,Installing cloud VM tools...)
 

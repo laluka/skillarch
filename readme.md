@@ -177,6 +177,8 @@ BASE_IMAGE="$PWD/Arch-Linux-x86_64-cloudimg.qcow2" OUTPUT="$PWD/skillarch.qcow2"
 sha256sum -c skillarch.qcow2.sha256
 ```
 
+New SkillArch qcow2 and Docker images use `hacker` / `offenskill` for local login. The root password is locked. Use `sudo` for administration and `passwd` to change the default.
+
 Supply an SSH key through cloud-init at first boot. The build uses a temporary SSH key for verification. To export an existing installed libvirt guest, use `make cloud-export`.
 
 #### Boot it with libvirt / virsh (pure CLI, no GUI importer)

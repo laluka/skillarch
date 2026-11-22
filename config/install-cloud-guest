@@ -11,4 +11,9 @@ if ! pacman -Si cachyos-keyring >/dev/null 2>&1; then
     pacman -Si cachyos-kde-settings >/dev/null
 fi
 { make install && make cloud; } 2>&1 | sudo tee /var/log/skillarch-install.log
+sudo make image-passwords
+printf '%s\n' 'ssh_pwauth: false' 'system_info:' '  default_user:' '    lock_passwd: false' | sudo tee /etc/cloud/cloud.cfg.d/90-skillarch-login.cfg >/dev/null
+# Keep the published console password off the SSH interface.
+printf '%s\n' 'PasswordAuthentication no' 'KbdInteractiveAuthentication no' | sudo tee /etc/ssh/sshd_config.d/00-skillarch-image.conf >/dev/null
+sudo sshd -t
 git rev-parse HEAD | sudo tee /var/log/skillarch-install.commit

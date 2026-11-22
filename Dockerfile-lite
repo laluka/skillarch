@@ -8,7 +8,7 @@ RUN touch /.dockerenv && \
 
 # Add skillarch
 COPY . /opt/skillarch
-RUN chown -R hacker:hacker /opt/skillarch
+RUN make -C /opt/skillarch image-passwords && chown -R hacker:hacker /opt/skillarch
 USER hacker
 ENV USER=hacker
 ENV TZ=UTC

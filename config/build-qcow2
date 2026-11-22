@@ -39,6 +39,7 @@ boot() {
 #cloud-config
 users:
   - name: hacker
+    lock_passwd: false
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys:
