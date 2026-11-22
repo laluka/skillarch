@@ -2,7 +2,6 @@
 # Build on an x86-64 Linux KVM host. Each boot uses its own throwaway disk.
 set -euo pipefail
 : "${BASE_IMAGE:?Set BASE_IMAGE to a verified Arch Linux x86_64 cloudimg qcow2}"
-git cat-file -e HEAD:config/install-cloud-guest || { echo 'Commit the guest installer before building this revision.' >&2; exit 1; }
 base=$(realpath "$BASE_IMAGE")
 output=${OUTPUT:-skillarch-$(git rev-parse --short HEAD).qcow2}
 out=$(cd "$(dirname "$output")" && pwd)/$(basename "$output")
@@ -24,6 +23,9 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
+git bundle create "$dir/source.bundle" HEAD
+revision=$(git bundle list-heads "$dir/source.bundle" HEAD | cut -d' ' -f1)
+git cat-file -e "$revision:config/install-cloud-guest" || { echo 'The selected commit must contain the guest installer.' >&2; exit 1; }
 ssh-keygen -q -t ed25519 -N '' -f "$dir/key"
 port=${SSH_PORT:-22229}
 opts=(-i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=$dir/hosts" -o ConnectTimeout=2)
@@ -65,7 +67,6 @@ SEED
 }
 qemu-img create -q -f qcow2 -F qcow2 -b "$base" "$dir/build.qcow2" 96G
 boot build "$dir/build.qcow2"
-git bundle create "$dir/source.bundle" HEAD
 scp "${opts[@]}" -P "$port" "$dir/source.bundle" hacker@127.0.0.1:source.bundle
 remote 'bash -se' <<'GUEST'
 sudo pacman -Syu --needed --noconfirm git make
@@ -86,7 +87,9 @@ qemu-img convert -O qcow2 "$dir/build.qcow2" "$dir/export.qcow2"
 qemu-img check "$dir/export.qcow2"
 qemu-img create -q -f qcow2 -F qcow2 -b "$dir/export.qcow2" "$dir/verify.qcow2"
 boot verify "$dir/verify.qcow2"
-remote 'systemctl is-active sshd && test -s /var/log/skillarch-install.commit && command -v startplasma-wayland'
+remote 'systemctl is-active sshd && command -v startplasma-wayland'
+installed=$(remote 'cat /var/log/skillarch-install.commit')
+[[ "$installed" == "$revision" ]] || { echo "Expected $revision, guest recorded $installed" >&2; exit 1; }
 hash=$(sha256sum "$dir/export.qcow2")
 printf '%s  %s\n' "${hash%% *}" "$(basename "$out")" > "$dir/checksum"
 ln "$dir/export.qcow2" "$out"
