@@ -1,7 +1,7 @@
 .ONESHELL:
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -c
-.PHONY: help install sanity-check install-base install-cli-tools install-shell install-docker install-gui install-gui-tools install-remote-desktop install-offensive install-wordlists install-hardening cloud cloud-export update docker-build docker-build-full docker-run docker-run-full docker-run-remote docker-stop-remote clean test test-lite test-full doctor list-tools backup
+.PHONY: help install sanity-check install-base install-cli-tools install-shell install-docker install-gui install-gui-tools install-remote-desktop install-offensive install-wordlists install-hardening cloud cloud-export qcow2 update docker-build docker-build-full docker-run docker-run-full docker-run-remote docker-stop-remote clean test test-lite test-full doctor list-tools backup
 
 # -- Colors & UX Helpers --
 C_RST   := \033[0m
@@ -117,7 +117,7 @@ install-base: sanity-check ## Install base packages
 	sudo pacman --noconfirm -U /tmp/chaotic-keyring.pkg.tar.zst /tmp/chaotic-mirrorlist.pkg.tar.zst
 
 	# Ensure chaotic-aur is present in /etc/pacman.conf
-	grep -vP '\[chaotic-aur\]|Include = /etc/pacman.d/chaotic-mirrorlist' /etc/pacman.conf | sudo tee /etc/pacman.conf > /dev/null
+	sudo sed -i '/^\[chaotic-aur\]$$/d; /^Include = \/etc\/pacman.d\/chaotic-mirrorlist$$/d' /etc/pacman.conf
 	echo -e '[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist' | sudo tee -a /etc/pacman.conf > /dev/null
 
 	# Single populate + sync with all repos now configured
@@ -269,6 +269,7 @@ install-gui-tools: sanity-check ## Install GUI apps (Chrome, VSCode, Ghidra, etc
 	# Force refresh DBs - chaotic-aur rolls fast; stale local DB → 404 on package files (e.g. visual-studio-code-bin)
 	sudo pacman --noconfirm -Syy || true
 	$(PACMAN_INSTALL) vlc vlc-plugin-ffmpeg arandr blueman visual-studio-code-bin discord dunst filezilla flameshot ghex google-chrome gparted kdenlive kompare libreoffice-fresh meld okular qbittorrent torbrowser-launcher wireshark-qt ghidra signal-desktop dragon-drop-git emote guvcview audacity polkit-kde-agent kamoso thunar thunar-archive-plugin thunar-volman tumbler ffmpegthumbnailer gvfs gvfs-mtp file-roller
+	bash config/quiet-welcome
 	[[ ! -f /.dockerenv ]] && $(PACMAN_INSTALL) flatpak && flatpak install -y flathub com.obsproject.Studio || true
 	# Do not start services in docker
 
@@ -396,6 +397,12 @@ install-remote-desktop: sanity-check ## Install Plasma's RDP server and capture 
 	fi
 	$(call DONE,Remote desktop tools installed!)
 
+# Apply only while creating a fresh image, before the operator chooses a password.
+.PHONY: image-passwords
+image-passwords:
+	@printf '%s\n' 'hacker:offenskill' | chpasswd
+	usermod --password '!' root
+
 cloud: sanity-check ## (Standalone) Configure cloud-init and SSH for a cloud VM
 	$(call INFO,Installing cloud VM tools...)
 
@@ -441,6 +448,9 @@ cloud: sanity-check ## (Standalone) Configure cloud-init and SSH for a cloud VM
 	sudo snapper delete $$(sudo snapper list --columns number | tail -n +4 | tr -d ' ' | tr '\n' ' ') 2>/dev/null || true
 
 	$(call DONE,Cloud tools installed! Use make docker-run-remote for the browser desktop)
+
+qcow2: ## Build and boot-check a local SkillArch qcow2 from BASE_IMAGE
+	@bash config/build-qcow2
 
 cloud-export: ## Export a libvirt VM to a clean qcow2 (for Proxmox/DO import)
 	@$(call INFO,Scanning libvirt VMs via virsh...)
@@ -791,12 +801,7 @@ docker-run-full: ## Run full Docker image locally
 	sudo docker run --rm -it --name=ska --net=host -v /tmp:/tmp -e DISPLAY -v /tmp/.X11-unix/:/tmp/.X11-unix/ --privileged thelaluka/skillarch:full
 
 docker-run-remote: ## Run the full image's Plasma desktop in a browser
-	ska_password=$$(docker compose -f compose.remote.yml exec -T desktop printenv SKA_REMOTE_PASSWORD 2>/dev/null | grep -m1 -Ex '[0-9a-f]{32,64}' || openssl rand -hex 24) && \
-	ska_gid=$$(docker run --rm --pull=never --platform $(DOCKER_PLATFORM) \
-		--device=/dev/udmabuf:/dev/udmabuf:rw --entrypoint stat thelaluka/skillarch:full -c '%g' /dev/udmabuf) && \
-	SKA_REMOTE_PASSWORD=$$ska_password SKA_RENDER_GID=$$ska_gid SKA_DOCKER_PLATFORM=$(DOCKER_PLATFORM) \
-		docker compose -f compose.remote.yml up -d --wait && \
-	$(call DONE,Open http://localhost:8080/guacamole/)
+	@SKA_DOCKER_PLATFORM="$(DOCKER_PLATFORM)" bash config/start-remote
 
 docker-stop-remote: ## Remove the browser desktop containers and session state
 	docker compose -f compose.remote.yml down

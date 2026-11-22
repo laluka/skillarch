@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Build on an x86-64 Linux KVM host. Each boot uses its own throwaway disk.
+set -euo pipefail
+: "${BASE_IMAGE:?Set BASE_IMAGE to a verified Arch Linux x86_64 cloudimg qcow2}"
+base=$(realpath "$BASE_IMAGE")
+output=${OUTPUT:-skillarch-$(git rev-parse --short HEAD).qcow2}
+out=$(cd "$(dirname "$output")" && pwd)/$(basename "$output")
+[[ -f "$base" ]] || { echo "Base image is missing: $base" >&2; exit 1; }
+for path in "$out" "$out.sha256"; do
+    [[ ! -e "$path" && ! -L "$path" ]] || { echo "Output already exists: $path" >&2; exit 1; }
+done
+for tool in qemu-img qemu-system-x86_64 ssh-keygen ssh scp sha256sum; do
+    command -v "$tool" >/dev/null || { echo "Missing $tool" >&2; exit 1; }
+done
+if [[ $(uname -s) == Darwin ]]; then
+    cpu=(-accel tcg -cpu max)
+else
+    command -v cloud-localds >/dev/null
+    cpu=(-enable-kvm -cpu host)
+fi
+dir=$(mktemp -d "$(dirname "$out")/.skillarch-build.XXXXXXXX")
+pid=
+cleanup() {
+    if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
+    rm -rf -- "$dir"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+git bundle create "$dir/source.bundle" HEAD
+revision=$(git bundle list-heads "$dir/source.bundle" HEAD | cut -d' ' -f1)
+git cat-file -e "$revision:config/install-cloud-guest" || { echo 'The selected commit must contain the guest installer.' >&2; exit 1; }
+port=${SSH_PORT:-22229}
+opts=(-i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=$dir/hosts" -o ConnectTimeout=2)
+remote() { ssh "${opts[@]}" -p "$port" hacker@127.0.0.1 "$@"; }
+boot() {
+    local stage=$1 disk=$2
+    # A fresh login key on the verification boot exercises cloud-init key injection.
+    rm -f "$dir/key" "$dir/key.pub"
+    ssh-keygen -q -t ed25519 -N '' -f "$dir/key"
+    printf 'instance-id: skillarch-%s-%s\n' "$stage" "$(basename "$dir")" > "$dir/meta"
+    cat > "$dir/user" <<SEED
+#cloud-config
+users:
+  - name: hacker
+    lock_passwd: false
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - $(cat "$dir/key.pub")
+runcmd:
+  - [systemctl, enable, --now, sshd.service]
+SEED
+    if [[ $(uname -s) == Darwin ]]; then
+        mkdir -p "$dir/seed"
+        cp "$dir/user" "$dir/seed/user-data"
+        cp "$dir/meta" "$dir/seed/meta-data"
+        hdiutil makehybrid -quiet -iso -joliet -default-volume-name cidata -o "$dir/$stage.iso" "$dir/seed"
+    else
+        cloud-localds "$dir/$stage.iso" "$dir/user" "$dir/meta"
+    fi
+    rm -f "$dir/hosts"
+    qemu-system-x86_64 "${cpu[@]}" -smp 4 -m 8192 -display none -serial "file:$dir/serial" \
+        -drive "file=$disk,if=virtio,format=qcow2" -drive "file=$dir/$stage.iso,media=cdrom,format=raw,readonly=on" \
+        -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$port-:22" &
+    pid=$!
+    for ((i=0;i<180;i++)); do
+        kill -0 "$pid" || return 1
+        if remote true 2>/dev/null; then remote 'sudo cloud-init status --wait'; return; fi
+        sleep 2
+    done
+    tail -40 "$dir/serial" >&2
+    return 1
+}
+qemu-img create -q -f qcow2 -F qcow2 -b "$base" "$dir/build.qcow2" 96G
+boot build "$dir/build.qcow2"
+scp "${opts[@]}" -P "$port" "$dir/source.bundle" hacker@127.0.0.1:source.bundle
+remote 'bash -se' <<'GUEST'
+sudo pacman -Syu --needed --noconfirm git make
+sudo install -d -o hacker -g hacker /opt/skillarch
+git clone ~/source.bundle /opt/skillarch
+cd /opt/skillarch
+git switch -C main
+git remote set-url origin https://github.com/laluka/skillarch
+git config branch.main.remote origin
+git config branch.main.merge refs/heads/main
+rm ~/source.bundle
+bash config/install-cloud-guest
+GUEST
+remote 'rm -f ~/.ssh/authorized_keys && sudo rm -f /etc/ssh/ssh_host_* && sudo cloud-init clean --logs --machine-id && sudo systemctl poweroff --no-block'
+wait "$pid"
+pid=
+qemu-img convert -O qcow2 "$dir/build.qcow2" "$dir/export.qcow2"
+qemu-img check "$dir/export.qcow2"
+qemu-img create -q -f qcow2 -F qcow2 -b "$dir/export.qcow2" "$dir/verify.qcow2"
+boot verify "$dir/verify.qcow2"
+remote 'bash -se' <<'VERIFY'
+systemctl is-active sshd
+command -v startplasma-wayland
+command -v i3
+sudo docker info --format 'Docker server {{.ServerVersion}}'
+sudo sshd -T | grep -iqx 'passwordauthentication no'
+sudo sshd -T | grep -iqx 'kbdinteractiveauthentication no'
+VERIFY
+installed=$(remote 'cat /var/log/skillarch-install.commit')
+[[ "$installed" == "$revision" ]] || { echo "Expected $revision, guest recorded $installed" >&2; exit 1; }
+hash=$(sha256sum "$dir/export.qcow2")
+printf '%s  %s\n' "${hash%% *}" "$(basename "$out")" > "$dir/checksum"
+ln "$dir/export.qcow2" "$out"
+ln "$dir/checksum" "$out.sha256"
+echo "Boot verified: $out"

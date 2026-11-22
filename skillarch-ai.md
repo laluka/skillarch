@@ -40,13 +40,16 @@ make doctor             # Diagnose disk space, Docker, broken symlinks, .skabak 
 make list-tools         # Print versions of all installed offensive tools
 make backup             # Backup current dotfiles to timestamped dir
 make docker-build       # Build thelaluka/skillarch:lite locally
+BASE_IMAGE=/path/to/arch-cloudimg.qcow2 make qcow2  # Install, export, boot-check, and checksum locally
 make docker-build-full  # Build thelaluka/skillarch:full locally
 make docker-run         # Run lite container (--net=host, /tmp volume)
 make docker-run-full    # Run full container with X11 socket (GUI)
-make docker-run-remote  # Run full container with the Plasma browser desktop
+make docker-run-remote  # Pull the matching full image and start the Plasma browser desktop
 make docker-stop-remote # Remove the browser desktop containers and session state
 make clean              # Docker-only: clear caches (pacman, yay, pip, mise, go, npm, logs)
 ```
+
+The qcow2 build installs the committed checkout. Local image login is `hacker` / `offenskill`. Root password login is locked. Use a cloud-init SSH key for remote access. Select Plasma or i3 at graphical login.
 
 ---
 

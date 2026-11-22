@@ -1,0 +1,3 @@
+*.qcow2
+*.qcow2.sha256
+.skillarch-build.*/

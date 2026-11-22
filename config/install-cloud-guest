@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Run as the unprivileged guest owner in the SkillArch checkout.
+set -euo pipefail
+cd /opt/skillarch
+if ! pacman -Si cachyos-keyring >/dev/null 2>&1; then
+    repo_dir=$(mktemp -d)
+    trap 'rm -rf "$repo_dir"' EXIT
+    curl -fsSL https://mirror.cachyos.org/cachyos-repo.tar.xz -o "$repo_dir/repo.tar.xz"
+    tar -xJf "$repo_dir/repo.tar.xz" -C "$repo_dir"
+    (cd "$repo_dir/cachyos-repo" && sudo bash -c 'pacman() { command pacman --noconfirm "$@"; }; export -f pacman; exec bash cachyos-repo.sh --install')
+    pacman -Si cachyos-kde-settings >/dev/null
+fi
+{ make install && make cloud; } 2>&1 | sudo tee /var/log/skillarch-install.log
+sudo make image-passwords
+printf '%s\n' 'ssh_pwauth: false' 'system_info:' '  default_user:' '    lock_passwd: false' | sudo tee /etc/cloud/cloud.cfg.d/90-skillarch-login.cfg >/dev/null
+# Keep the published console password off the SSH interface.
+printf '%s\n' 'PasswordAuthentication no' 'KbdInteractiveAuthentication no' | sudo tee /etc/ssh/sshd_config.d/00-skillarch-image.conf >/dev/null
+sudo sshd -t
+git rev-parse HEAD | sudo tee /var/log/skillarch-install.commit
