@@ -26,12 +26,14 @@ trap 'exit 130' INT TERM
 git bundle create "$dir/source.bundle" HEAD
 revision=$(git bundle list-heads "$dir/source.bundle" HEAD | cut -d' ' -f1)
 git cat-file -e "$revision:config/install-cloud-guest" || { echo 'The selected commit must contain the guest installer.' >&2; exit 1; }
-ssh-keygen -q -t ed25519 -N '' -f "$dir/key"
 port=${SSH_PORT:-22229}
 opts=(-i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=$dir/hosts" -o ConnectTimeout=2)
 remote() { ssh "${opts[@]}" -p "$port" hacker@127.0.0.1 "$@"; }
 boot() {
     local stage=$1 disk=$2
+    # A fresh login key on the verification boot exercises cloud-init key injection.
+    rm -f "$dir/key" "$dir/key.pub"
+    ssh-keygen -q -t ed25519 -N '' -f "$dir/key"
     printf 'instance-id: skillarch-%s-%s\n' "$stage" "$(basename "$dir")" > "$dir/meta"
     cat > "$dir/user" <<SEED
 #cloud-config
