@@ -98,8 +98,8 @@ systemctl is-active sshd
 command -v startplasma-wayland
 command -v i3
 sudo docker info --format 'Docker server {{.ServerVersion}}'
-sudo sshd -T | grep -qx 'passwordauthentication no'
-sudo sshd -T | grep -qx 'kbdinteractiveauthentication no'
+sudo sshd -T | grep -iqx 'passwordauthentication no'
+sudo sshd -T | grep -iqx 'kbdinteractiveauthentication no'
 VERIFY
 installed=$(remote 'cat /var/log/skillarch-install.commit')
 [[ "$installed" == "$revision" ]] || { echo "Expected $revision, guest recorded $installed" >&2; exit 1; }
