@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eu
+export SKA_DESKTOP_IMAGE="${SKA_DESKTOP_IMAGE:-thelaluka/skillarch:full-$(git rev-parse HEAD)}"
+if ! docker image inspect "$SKA_DESKTOP_IMAGE" >/dev/null 2>&1; then
+	docker pull --platform "$SKA_DOCKER_PLATFORM" "$SKA_DESKTOP_IMAGE"
+fi
+ska_gid=$(docker run --rm --platform "$SKA_DOCKER_PLATFORM" \
+	--device=/dev/udmabuf:/dev/udmabuf:rw --entrypoint stat "$SKA_DESKTOP_IMAGE" -c '%g' /dev/udmabuf) || {
+	echo 'The Docker host needs a kernel with /dev/udmabuf available for Plasma.' >&2
+	exit 1
+}
+export SKA_RENDER_GID="$ska_gid"
+ska_password=$(docker compose -f compose.remote.yml exec -T desktop printenv SKA_REMOTE_PASSWORD 2>/dev/null | grep -m1 -Ex '[0-9a-f]{32,64}' || openssl rand -hex 24)
+SKA_REMOTE_PASSWORD="$ska_password" docker compose -f compose.remote.yml up -d --wait
+echo 'Open http://localhost:8080/guacamole/'
+echo 'For a remote Docker host: ssh -N -L 8080:127.0.0.1:8080 user@host'

@@ -9,6 +9,18 @@
 
 ---
 
+## Try the desktop in Docker
+
+On a Docker host with Compose and `/dev/udmabuf`, run:
+
+```bash
+git clone --depth 1 https://github.com/laluka/skillarch
+cd skillarch
+make docker-run-remote
+```
+
+Open [the Plasma desktop](http://localhost:8080/guacamole/). The first run downloads the full workstation image. Subsequent launches reuse it. For SSH forwarding and cleanup, see [Plasma browser desktop in Docker](#plasma-browser-desktop-in-docker).
+
 ## How To Install
 
 ### SIMPLE / NO-CUSTOMIZE / NO-BACKUP
@@ -91,6 +103,7 @@ make help
 #   install-wordlists   Install wordlists (SecLists, rockyou, etc.)
 #   install-hardening   Install hardening tools (opensnitch)
 #   cloud               (Standalone) Configure cloud-init and SSH for a cloud VM
+#   qcow2               Build and boot-check a local SkillArch qcow2 from BASE_IMAGE
 #   cloud-export        Export a libvirt VM to a clean qcow2 (for Proxmox/DO import)
 #   update              Update SkillArch (pull & prompt reinstall)
 #   test                Validate installation (smoke tests)
@@ -137,9 +150,9 @@ make help
 
 ### VM Hosts
 
-> **GNOME Boxes is now the first-class citizen** 🥳: zero-config, dead-simple, "just works" with the SkillArch qcow image below. `virt-manager` (from `qemu-full`) remains a great power-user alternative. VirtualBox had too many regressions (not recommended anymore but still supported on a best-effort basis).
+> **GNOME Boxes is now the first-class citizen** 🥳: zero-config, dead-simple, "just works" with a locally built SkillArch qcow image. `virt-manager` (from `qemu-full`) remains a great power-user alternative. VirtualBox had too many regressions (not recommended anymore but still supported on a best-effort basis).
 
-- GNOME Boxes: `sudo pacman -S gnome-boxes` (not in SkillArch's default install), launch it, "New" → pick the downloaded qcow, done.
+- GNOME Boxes: `sudo pacman -S gnome-boxes` (not in SkillArch's default install), launch it, "New" → pick your local qcow, done.
 - `virt-manager`: `sudo pacman -S qemu-full virt-manager` then `virt-manager` → New VM → import existing qcow.
 - VirtualBox (legacy path):
   - `ska-vbox-install-guestutils`: auto-installs `virtualbox-guest-utils`
@@ -151,35 +164,27 @@ make help
     - Currently it's only started in i3 while not running in an hypervisor
     - In `~/config/i3/config` : `killall -q picom ; grep -qF hypervisor /proc/cpuinfo || picom`
 
-### Pre-Built SkillArch qcow (no install, just boot)
+### Build a SkillArch qcow2 locally
 
-I maintain a ready-to-boot SkillArch qcow2 image on a private basic-auth mirror. No install needed, just download and boot in GNOME Boxes / virt-manager / Proxmox / any qemu frontend.
+Start with the official Arch Linux x86_64 **cloudimg**. On an x86-64 KVM host install QEMU, cloud-localds, OpenSSH, Git and GNU coreutils. Allow 8 GiB of guest RAM plus host overhead. The builder grows a disposable overlay to 96 GiB, runs the installer, then boots a fresh overlay of the exported disk and checks cloud-init and SSH. The base stays available for another build. The guest receives the checked-out Git commit. Commit changes you want to test before starting a build.
 
 ```bash
-BASE='http://skillarch:mercilaluuu@bs.offenskill.com:42069/skillarch'
-
-# --- List available images ---
-curl -s -H 'Accept: application/json' "$BASE/" | jq -r '.[].name' | sort -r
-
-# --- Download the latest in one shot ---
-LATEST=$(curl -s -H 'Accept: application/json' "$BASE/" | jq -r '.[].name' | sort -r | head -1)
-echo "Downloading: $LATEST"
-wget --continue --user-agent='Mozilla/5.0 (X11; Linux x86_64)' "$BASE/$LATEST"
-echo "Downloaded: $LATEST"
+base=https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2
+curl -fLO "$base"
+curl -fLO "$base.SHA256"
+sha256sum -c Arch-Linux-x86_64-cloudimg.qcow2.SHA256
+BASE_IMAGE="$PWD/Arch-Linux-x86_64-cloudimg.qcow2" OUTPUT="$PWD/skillarch.qcow2" make qcow2
+sha256sum -c skillarch.qcow2.sha256
 ```
 
-- The cloud target (`make cloud`) configures cloud-init and SSH. Use the Docker browser desktop below for graphical access.
-- BIOS boot (not UEFI); import works everywhere without firmware fiddling.
-- Default user: `hacker`, password: `skillarch` ⚠️ **change it on first boot** (`passwd`) -- the image ships with a known password for convenience, do NOT expose it to the internet without changing it first.
-- Passwordless sudo enabled (cloud-init).
-- See the [Cloud Target](#cloud-target-standalone----make-cloud) section for how the image is produced (`make cloud-export` flattens snapshots, sparsifies, and sysprep's).
+Supply an SSH key through cloud-init at first boot. The build uses a temporary SSH key for verification. To export an existing installed libvirt guest, use `make cloud-export`.
 
 #### Boot it with libvirt / virsh (pure CLI, no GUI importer)
 
 Proven reliable params for the SkillArch qcow: q35, host-passthrough CPU, virtio disk/net, qemu-guest-agent, SPICE + QXL:
 
 ```bash
-QCOW="$PWD/$LATEST"     # from the download block above
+QCOW="$PWD/skillarch.qcow2"
 
 virt-install --connect qemu:///session \
   --name skillarch \
@@ -187,6 +192,7 @@ virt-install --connect qemu:///session \
   --machine q35 --cpu host-passthrough \
   --osinfo detect=on,require=off \
   --disk path="$QCOW",bus=virtio,format=qcow2 \
+  --cloud-init clouduser-ssh-key="$HOME/.ssh/id_ed25519.pub" \
   --network network=default,model=virtio \
   --channel unix,target_type=virtio,target_name='org.qemu.guest_agent.0' \
   --rng /dev/urandom \
@@ -435,9 +441,10 @@ The following systemd services are installed but **disabled and stopped by defau
 The full image can run a 1920×1080 Plasma Wayland session with the SkillArch wallpaper through KRDP and Guacamole. Both images start a shell by default. Local builds default to `linux/amd64`. The Linux Docker host (or its VM on macOS) needs `/dev/udmabuf` for software rendering. The start target handles its group permissions.
 
 ```bash
-make docker-build-full
-make docker-run-remote
+make docker-run-remote  # Pull the full image published for this checkout
 ```
+
+For an unpublished checkout, build with `make docker-build-full` and run `SKA_DESKTOP_IMAGE=thelaluka/skillarch:full make docker-run-remote`.
 
 Open [the browser desktop](http://localhost:8080/guacamole/). It opens Plasma directly, with no username or password prompt. The stack is off by default and starts in the background on host loopback. Run `make docker-stop-remote` to stop it and remove its writable session state. Anyone who can reach the loopback endpoint, including through an SSH tunnel, can control the desktop.
 

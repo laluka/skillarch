@@ -2,7 +2,7 @@ name: skillarch-remote
 
 services:
   desktop:
-    image: thelaluka/skillarch:full
+    image: "${SKA_DESKTOP_IMAGE:-thelaluka/skillarch:full}"
     pull_policy: never
     platform: "${SKA_DOCKER_PLATFORM:-linux/amd64}"
     init: true
