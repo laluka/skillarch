@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Mark the installed Plasma release as seen and skip its post-upgrade tour.
+version=$(QT_QPA_PLATFORM=offscreen plasmashell --version)
+kwriteconfig6 --file plasma-welcomerc --group General --key LastSeenVersion "${version##* }"
+kwriteconfig6 --file plasma-welcomerc --group General --key ShowUpdatePage --type bool false
+
+# Emote stores its first-run flag alongside shortcuts and recent emoji.
+# Use its shelf format without importing the GTK application during installation.
+/usr/bin/python - <<'PY'
+from pathlib import Path
+import shelve
+
+directory = Path.home() / ".local/share/Emote"
+directory.mkdir(parents=True, exist_ok=True)
+with shelve.open(str(directory / "user_data")) as settings:
+    settings["shown_welcome"] = True
+PY
