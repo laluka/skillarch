@@ -87,7 +87,7 @@ qemu-img convert -O qcow2 "$dir/build.qcow2" "$dir/export.qcow2"
 qemu-img check "$dir/export.qcow2"
 qemu-img create -q -f qcow2 -F qcow2 -b "$dir/export.qcow2" "$dir/verify.qcow2"
 boot verify "$dir/verify.qcow2"
-remote 'systemctl is-active sshd && command -v startplasma-wayland'
+remote 'systemctl is-active sshd && command -v startplasma-wayland && sudo docker info --format "Docker server {{.ServerVersion}}"'
 installed=$(remote 'cat /var/log/skillarch-install.commit')
 [[ "$installed" == "$revision" ]] || { echo "Expected $revision, guest recorded $installed" >&2; exit 1; }
 hash=$(sha256sum "$dir/export.qcow2")
