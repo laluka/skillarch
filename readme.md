@@ -166,7 +166,7 @@ make help
 
 ### Build a SkillArch qcow2 locally
 
-Start with the official Arch Linux x86_64 **cloudimg**. On an x86-64 KVM host install QEMU, cloud-localds, OpenSSH, Git and GNU coreutils. Allow 8 GiB of guest RAM plus host overhead. The builder grows a disposable overlay to 96 GiB, runs the installer, then boots a fresh overlay of the exported disk and checks cloud-init and SSH. The base stays available for another build. The guest receives the checked-out Git commit. Commit changes you want to test before starting a build.
+Start with the official Arch Linux x86_64 **cloudimg**. On an x86-64 KVM host install QEMU, cloud-localds, OpenSSH, Git and GNU coreutils. Allow 8 GiB of guest RAM plus host overhead. The builder grows a disposable overlay to 96 GiB, runs the installer, then boots a fresh overlay of the exported disk and checks cloud-init and SSH. The base stays available for another build. The guest receives the checked-out Git commit. Commit changes you want to test before starting a build. Choose an unused output filename.
 
 ```bash
 base=https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2
@@ -179,7 +179,9 @@ sha256sum -c skillarch.qcow2.sha256
 
 New SkillArch qcow2 and Docker images use `hacker` / `offenskill` for local login. The root password is locked. Use `sudo` for administration and `passwd` to change the default.
 
-Supply an SSH key through cloud-init at first boot. The build uses a temporary SSH key for verification. To export an existing installed libvirt guest, use `make cloud-export`.
+Choose **Plasma (Wayland)** or **i3** at the graphical login screen. Plasma starts with the KDE and Emote welcome screens already acknowledged.
+
+Supply an SSH key through cloud-init at first boot. The verification boot uses a fresh key and checks the installed Git revision, both desktop binaries, Docker, and SSH’s password-authentication settings. For a graphical smoke test, sign in to each desktop, open a terminal, and log out before switching sessions. To export an existing installed libvirt guest, use `make cloud-export`.
 
 #### Boot it with libvirt / virsh (pure CLI, no GUI importer)
 

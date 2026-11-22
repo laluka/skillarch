@@ -49,6 +49,8 @@ make docker-stop-remote # Remove the browser desktop containers and session stat
 make clean              # Docker-only: clear caches (pacman, yay, pip, mise, go, npm, logs)
 ```
 
+The qcow2 build installs the committed checkout. Local image login is `hacker` / `offenskill`. Root password login is locked. Use a cloud-init SSH key for remote access. Select Plasma or i3 at graphical login.
+
 ---
 
 ## Shell Aliases (config/aliases)

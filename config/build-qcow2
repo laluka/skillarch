@@ -5,7 +5,10 @@ set -euo pipefail
 base=$(realpath "$BASE_IMAGE")
 output=${OUTPUT:-skillarch-$(git rev-parse --short HEAD).qcow2}
 out=$(cd "$(dirname "$output")" && pwd)/$(basename "$output")
-[[ -f "$base" && ! -e "$out" && ! -e "$out.sha256" ]]
+[[ -f "$base" ]] || { echo "Base image is missing: $base" >&2; exit 1; }
+for path in "$out" "$out.sha256"; do
+    [[ ! -e "$path" && ! -L "$path" ]] || { echo "Output already exists: $path" >&2; exit 1; }
+done
 for tool in qemu-img qemu-system-x86_64 ssh-keygen ssh scp sha256sum; do
     command -v "$tool" >/dev/null || { echo "Missing $tool" >&2; exit 1; }
 done
@@ -90,7 +93,14 @@ qemu-img convert -O qcow2 "$dir/build.qcow2" "$dir/export.qcow2"
 qemu-img check "$dir/export.qcow2"
 qemu-img create -q -f qcow2 -F qcow2 -b "$dir/export.qcow2" "$dir/verify.qcow2"
 boot verify "$dir/verify.qcow2"
-remote 'systemctl is-active sshd && command -v startplasma-wayland && sudo docker info --format "Docker server {{.ServerVersion}}"'
+remote 'bash -se' <<'VERIFY'
+systemctl is-active sshd
+command -v startplasma-wayland
+command -v i3
+sudo docker info --format 'Docker server {{.ServerVersion}}'
+sudo sshd -T | grep -qx 'passwordauthentication no'
+sudo sshd -T | grep -qx 'kbdinteractiveauthentication no'
+VERIFY
 installed=$(remote 'cat /var/log/skillarch-install.commit')
 [[ "$installed" == "$revision" ]] || { echo "Expected $revision, guest recorded $installed" >&2; exit 1; }
 hash=$(sha256sum "$dir/export.qcow2")
