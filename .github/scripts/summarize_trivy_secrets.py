@@ -25,29 +25,27 @@ def image_triage(target, secret):
     """Classify verified public data; leave new locations visible for review."""
     rule = secret.get("RuleID")
     if rule == "aws-account-id":
-        return "ignored: account identifier", "AWS account ID"
+        return "ignored: account identifier"
     if WORDLIST_PATH.search(target):
-        return "ignored: wordlist", "Bundled wordlists"
+        return "ignored: wordlist"
     if target.startswith("/home/hacker/.nuclei-templates/"):
-        return "ignored: public examples", "Nuclei templates and payloads"
+        return "ignored: public examples"
     if target.startswith(("/opt/metasploit/spec/", "/opt/exploitdb/exploits/", "/opt/phpggc/gadgetchains/")):
-        return "ignored: public examples", "Upstream tests and exploit examples"
+        return "ignored: public examples"
     if FASTHTTP_TEST_KEY.fullmatch(target) or GO_TEST_KEY.fullmatch(target):
-        return "ignored: public examples", "Upstream test keys"
+        return "ignored: public examples"
     if (rule == "azure-storage-account-key"
             and target == "/home/hacker/.vscode/extensions/ms-azuretools.vscode-containers-2.5.3/dist/extension.bundle.js"
             and "devstoreaccount1" in secret.get("Match", "")):
-        return "ignored: documented placeholder", "Azurite emulator key"
+        return "ignored: documented placeholder"
     if target.startswith(("/opt/metasploit/data/exploits/", "/opt/metasploit/modules/")):
-        return "reviewed: upstream key material", "Metasploit exploit material"
+        return "ignored: upstream key material"
     if UV_UPSTREAM_SOURCE.fullmatch(target):
-        if target.endswith("/yt_dlp/extractor/shahid.py"):
-            return "reviewed: upstream key material", "yt-dlp Shahid extractor"
-        return "reviewed: upstream key material", "Installed third-party package source"
+        return "ignored: upstream key material"
     if target in ("/opt/HExHTTP/build/lib/modules/technos/cloudflare.py",
                   "/opt/HExHTTP/modules/technos/cloudflare.py"):
-        return "reviewed: upstream key material", "HExHTTP upstream source"
-    return "unreviewed", "New location"
+        return "ignored: upstream key material"
+    return "unreviewed"
 
 
 def cell(value):
@@ -64,9 +62,6 @@ def main():
 
     report = json.loads(args.report.read_text())
     findings = {}
-    decisions = Counter()
-    reviewed = Counter()
-    reviewed_targets = {}
     total = 0
     for result in report.get("Results") or []:
         target = result.get("Target") or "unknown target"
@@ -76,43 +71,23 @@ def main():
             line = secret.get("StartLine") or "—"
             key = (rule, target, line)
             severity = secret.get("Severity") or "UNKNOWN"
-            decision, source = image_triage(target, secret) if args.triage_image else ("unreviewed", "")
+            decision = image_triage(target, secret) if args.triage_image else "unreviewed"
             previous = findings.get(key)
             if previous is None or SEVERITY_RANK.get(severity, 0) > SEVERITY_RANK.get(previous[0], 0):
                 findings[key] = (severity, decision)
-            if args.triage_image:
-                decisions[decision] += 1
-                if decision == "reviewed: upstream key material":
-                    review_key = (severity, rule, source)
-                    reviewed[review_key] += 1
-                    reviewed_targets.setdefault(review_key, set()).add(target)
 
     ordered = sorted(findings.items(), key=lambda item: (
         -SEVERITY_RANK.get(item[1][0], 0), item[0][0], item[0][1], str(item[0][2])
     ))
-    counts = Counter(severity for severity, _ in findings.values())
     print(f"## Trivy secrets: {cell(args.scope)}\n")
-    print(f"**{total} matches in {len(findings)} distinct locations** "
-          f"({counts['CRITICAL']} critical, {counts['HIGH']} high, "
-          f"{counts['MEDIUM']} medium, {counts['LOW']} low).\n")
     if args.triage_image:
-        print("| Triage | Matches |")
-        print("| --- | ---: |")
-        for decision, count in sorted(decisions.items()):
-            print(f"| {cell(decision)} | {count} |")
-        print("\nKnown public examples and wordlists are excluded from the active finding list. "
-              "Reviewed upstream key material remains visible below; some keys are real public "
-              "vendor defaults or embedded tool credentials, not SkillArch-owned secrets.\n")
-        if reviewed:
-            print("| Reviewed upstream source | Severity | Rule | Matches | Example target |")
-            print("| --- | --- | --- | ---: | --- |")
-            for (severity, rule, source), count in sorted(reviewed.items(), key=lambda item: (
-                    -SEVERITY_RANK.get(item[0][0], 0), item[0][2], item[0][1])):
-                example = sorted(reviewed_targets[(severity, rule, source)])[0]
-                print(f"| {cell(source)} | {cell(severity)} | {cell(rule)} | {count} | {cell(example)} |")
-            print()
         ordered = [item for item in ordered if item[1][1] == "unreviewed"]
-        print(f"**{len(ordered)} unreviewed locations** remain.\n")
+        print(f"**{len(ordered)} unreviewed secret findings.**\n")
+    else:
+        counts = Counter(severity for severity, _ in findings.values())
+        print(f"**{total} matches in {len(findings)} distinct locations** "
+              f"({counts['CRITICAL']} critical, {counts['HIGH']} high, "
+              f"{counts['MEDIUM']} medium, {counts['LOW']} low).\n")
     if ordered:
         print("Matched values and source snippets are omitted from CI logs. "
               "Run Trivy locally to inspect a finding.\n")
