@@ -88,13 +88,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Run Trivy in fs mode
+      - name: Scan repository for secrets
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: 'v0.76.2'
           scan-type: 'fs'
           scan-ref: '.'
-          scanners: 'misconfig,secret'
+          scanners: 'secret'
+          format: 'json'
+          output: 'trivy-fs-secrets.json'
+          exit-code: '0'
+      - name: Summarize repository secrets
+        run: python3 .github/scripts/summarize_trivy_secrets.py trivy-fs-secrets.json repository --fail-on-findings | tee -a "$GITHUB_STEP_SUMMARY"
 
   trivy-image:
     if: github.repository == 'laluka/SkillArch' && github.ref == 'refs/heads/main'
@@ -105,30 +110,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Report full-image vulnerabilities
+      - name: Scan full image for secrets
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: 'v0.76.2'
           image-ref: 'thelaluka/skillarch:full-${{ github.sha }}'
           format: 'json'
-          output: 'trivy-image.json'
+          output: 'trivy-image-secrets.json'
           exit-code: '0'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          scanners: 'vuln'
+          scanners: 'secret'
           timeout: '60m'
-          skip-dirs: '/opt/lists,/opt/ghidra,/opt/metasploit,/opt/exploitdb,/home/hacker/.rustup/toolchains,/home/hacker/.local/go,/opt/phpggc,/opt/pypotomux/wordlists,/usr/NX/etc/keys,/usr/NX/share/keys,/home/hacker/.nuclei-templates,/home/hacker/.local/share/mise/installs/go,/home/hacker/.cache/mise,/home/hacker/.fzf,/usr/lib/qt/mkspecs,/usr/lib/qt6/mkspecs,/home/hacker/.cache/uv/archive-v0' # Chunky boys
-      - name: Summarize unique findings
-        run: python3 .github/scripts/summarize_trivy.py trivy-image.json | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Upload full Trivy report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: trivy-full-image-${{ github.sha }}
-          path: trivy-image.json
-          if-no-files-found: warn
-          retention-days: 14
+      - name: Summarize image secrets
+        run: python3 .github/scripts/summarize_trivy_secrets.py trivy-image-secrets.json 'full image' | tee -a "$GITHUB_STEP_SUMMARY"
 
   betterleaks:
     if: github.repository == 'laluka/SkillArch'
