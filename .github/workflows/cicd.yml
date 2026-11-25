@@ -99,6 +99,7 @@ jobs:
           output: 'trivy-fs-secrets.json'
           exit-code: '0'
       - name: Summarize repository secrets
+        shell: bash
         run: python3 .github/scripts/summarize_trivy_secrets.py trivy-fs-secrets.json repository --fail-on-findings | tee -a "$GITHUB_STEP_SUMMARY"
 
   trivy-image:
@@ -121,7 +122,8 @@ jobs:
           scanners: 'secret'
           timeout: '60m'
       - name: Summarize image secrets
-        run: python3 .github/scripts/summarize_trivy_secrets.py trivy-image-secrets.json 'full image' | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
+        run: python3 .github/scripts/summarize_trivy_secrets.py trivy-image-secrets.json 'full image' --triage-image | tee -a "$GITHUB_STEP_SUMMARY"
 
   betterleaks:
     if: github.repository == 'laluka/SkillArch'
