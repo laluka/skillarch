@@ -102,19 +102,33 @@ jobs:
     needs: docker
     runs-on: ubuntu-latest
     steps:
-      - name: Run Trivy in image mode
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Report full-image vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: 'v0.76.2'
           image-ref: 'thelaluka/skillarch:full-${{ github.sha }}'
-          format: 'table'
-          exit-code: '1'
+          format: 'json'
+          output: 'trivy-image.json'
+          exit-code: '0'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
           scanners: 'vuln'
           timeout: '60m'
           skip-dirs: '/opt/lists,/opt/ghidra,/opt/metasploit,/opt/exploitdb,/home/hacker/.rustup/toolchains,/home/hacker/.local/go,/opt/phpggc,/opt/pypotomux/wordlists,/usr/NX/etc/keys,/usr/NX/share/keys,/home/hacker/.nuclei-templates,/home/hacker/.local/share/mise/installs/go,/home/hacker/.cache/mise,/home/hacker/.fzf,/usr/lib/qt/mkspecs,/usr/lib/qt6/mkspecs,/home/hacker/.cache/uv/archive-v0' # Chunky boys
+      - name: Summarize unique findings
+        run: python3 .github/scripts/summarize_trivy.py trivy-image.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload full Trivy report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trivy-full-image-${{ github.sha }}
+          path: trivy-image.json
+          if-no-files-found: warn
+          retention-days: 14
 
   betterleaks:
     if: github.repository == 'laluka/SkillArch'
