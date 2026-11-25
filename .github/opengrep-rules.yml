@@ -1,0 +1,29 @@
+rules:
+  - id: untrusted-github-event-in-workflow
+    languages: [generic]
+    severity: ERROR
+    message: Untrusted event data in a workflow can become shell code; pass it through an environment variable.
+    paths:
+      include:
+        - .github/workflows/*.yml
+        - .github/workflows/*.yaml
+    pattern-regex: '\$\{\{\s*github\.event\.(?:issue|pull_request|discussion|comment)\.'
+
+  - id: pull-request-target-workflow
+    languages: [generic]
+    severity: WARNING
+    message: Review pull_request_target carefully because it can expose repository credentials to untrusted pull requests.
+    paths:
+      include:
+        - .github/workflows/*.yml
+        - .github/workflows/*.yaml
+    pattern-regex: '(?m)^\s*pull_request_target\s*:'
+
+  - id: dockerfile-remote-add
+    languages: [generic]
+    severity: WARNING
+    message: Pin and verify remote build inputs before adding them to an image.
+    paths:
+      include:
+        - Dockerfile*
+    pattern-regex: '(?im)^\s*ADD\s+https?://'

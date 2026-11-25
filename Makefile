@@ -154,7 +154,7 @@ install-cli-tools: sanity-check ## Install CLI tools & runtimes
 	eval "$$(mise activate bash)" || true
 
 	# Install uv tools
-	for package in argcomplete bypass-url-parser pre-commit sqlmap wafw00f yt-dlp semgrep defaultcreds-cheat-sheet; do
+	for package in argcomplete bypass-url-parser pre-commit sqlmap wafw00f yt-dlp defaultcreds-cheat-sheet; do
 		uv tool install "$$package" || {
 			$(call WARN,Retrying $$package install...)
 			uv tool install -q "$$package"
@@ -285,7 +285,7 @@ install-gui-tools: sanity-check ## Install GUI apps (Chrome, VSCode, Ghidra, etc
 install-offensive: sanity-check ## Install offensive & security tools
 	$(call INFO,Installing offensive tools...)
 	ska_clone() { local pkg=$${1##*/}; [[ ! -d "/opt/$$pkg" ]] && git clone --depth=1 "$$1" "/tmp/$$pkg" && sudo mv "/tmp/$$pkg" "/opt/$$pkg" || true ; }
-	$(PACMAN_INSTALL) metasploit fx lazygit fq gitleaks jdk21-openjdk hashcat bettercap bore
+	$(PACMAN_INSTALL) metasploit fx lazygit fq jdk21-openjdk hashcat bettercap bore
 	for pkg in ffuf gau waybackurls fabric-ai-bin caido-desktop caido-cli; do yay --noconfirm --needed -S "$$pkg" || $(call WARN,Failed to install $$pkg$(comma) continuing...); done
 
 	# HExHTTP: HTTP header vuln/cache-poisoning scanner - clone + isolated venv + PATH shim.
@@ -305,7 +305,19 @@ install-offensive: sanity-check ## Install offensive & security tools
 	mise exec -- go install github.com/sensepost/gowitness@latest > /dev/null &
 	wait
 
-	# Install GitHub binary releases -- gobypass403 & wpprobe (sequential)
+	# Verified release binaries avoid compiling large security scanners in Docker builds.
+	if [[ ! -x /usr/local/bin/opengrep ]] || [[ "$$(/usr/local/bin/opengrep --version 2>/dev/null)" != "2.0.0" ]]; then
+		curl -fsSL -o /tmp/opengrep https://github.com/opengrep/opengrep/releases/download/v2.0.0/opengrep_linux_x86
+		echo '37e93f4da5fd04a18c5c1febbdd12f7e98dfccd4d0c9cf2593bcb25eeb462da0  /tmp/opengrep' | sha256sum -c -
+		chmod +x /tmp/opengrep && sudo mv /tmp/opengrep /usr/local/bin/opengrep
+	fi
+	if [[ ! -x /usr/local/bin/betterleaks ]] || [[ "$$(/usr/local/bin/betterleaks version 2>/dev/null)" != "1.10.1" ]]; then
+		curl -fsSL -o /tmp/betterleaks.tar.gz https://github.com/betterleaks/betterleaks/releases/download/v1.10.1/betterleaks_1.10.1_linux_x64.tar.gz
+		echo 'c174b42d7aa60caf58c0c3e555c0e4bed01fe6b0d99a412bce777b5af4ce913e  /tmp/betterleaks.tar.gz' | sha256sum -c -
+		tar -xzf /tmp/betterleaks.tar.gz -C /tmp betterleaks && sudo mv /tmp/betterleaks /usr/local/bin/betterleaks
+	fi
+
+	# Install other GitHub binary releases -- gobypass403 & wpprobe (sequential)
 	# Resolve the latest asset WITHOUT the api.github.com endpoint (60 req/h unauthenticated
 	# limit -- flaky on shared CI runner IPs). The github.com /releases/latest redirect gives
 	# the tag, then /expanded_assets/<tag> lists the real asset href (no API budget spent, no
@@ -559,6 +571,8 @@ test: ## Validate installation (smoke tests)
 	for bin in nmap ffuf msfconsole hashcat bettercap gobypass403 wpprobe; do
 		ska_check "$$bin" "which $$bin"
 	done
+	ska_check "opengrep"   "which opengrep"
+	ska_check "betterleaks" "which betterleaks"
 	ska_check "sqlmap"      "which sqlmap || [[ -f ~/.local/bin/sqlmap ]]"
 	ska_check "hexhttp"     "which hexhttp || [[ -f ~/.local/bin/hexhttp ]]"
 	ska_check "nuclei"      "which nuclei || [[ -f ~/.pdtm/go/bin/nuclei ]]"
@@ -611,6 +625,8 @@ test-lite: ## Validate lite Docker image install
 	for bin in ffuf hashcat bettercap msfconsole gobypass403 wpprobe; do
 		ska_check "$$bin" "which $$bin"
 	done
+	ska_check "opengrep"   "which opengrep"
+	ska_check "betterleaks" "which betterleaks"
 	ska_check "hexhttp"   "which hexhttp || [[ -f ~/.local/bin/hexhttp ]]"
 	ska_check "nuclei"    "which nuclei || [[ -f ~/.pdtm/go/bin/nuclei ]]"
 	ska_check "httpx"     "which httpx || [[ -f ~/.pdtm/go/bin/httpx ]]"
@@ -757,7 +773,8 @@ list-tools: ## List installed offensive tools & versions
 	ska_ver "msfconsole" "msfconsole --version 2>&1 | head -1"
 	ska_ver "hashcat"    "hashcat --version 2>&1 | head -1"
 	ska_ver "bettercap"  "bettercap -version"
-	ska_ver "gitleaks"   "gitleaks version 2>&1"
+	ska_ver "opengrep"   "opengrep --version 2>&1"
+	ska_ver "betterleaks" "betterleaks version 2>&1"
 	ska_ver "caido"      "caido --version 2>&1 | head -1"
 	ska_ver "ghidra"     "cat /opt/ghidra/bom.json| jq -r '.components[].version'|head -1" ## "echo 'installed (GUI)'"
 	ska_ver "wireshark"  "wireshark --version 2>&1 | head -1"

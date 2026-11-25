@@ -225,7 +225,7 @@ The qcow2 build installs the committed checkout. Local image login is `hacker` /
 | Alias | Tool | Purpose |
 |---|---|---|
 | `dtrufflehog` | trufflesecurity/trufflehog | Secret scanning in git history |
-| `dgitleaks` | zricethezav/gitleaks | Secret scanning |
+| `dbetterleaks` | betterleaks/betterleaks | Secret scanning |
 | `drecon-amass` | caffix/amass | Subdomain enumeration |
 | `drecon-findomain` | edu4rdshl/findomain | Fast subdomain discovery |
 | `drecon-wappa` | wappalyzer/cli | Tech fingerprinting |
@@ -323,7 +323,7 @@ The qcow2 build installs the committed checkout. Local image login is `hacker` /
 `bat`, `eza`, `fzf`, `ripgrep`, `fd`, `jq`, `glow`, `jless`, `gron`, `htmlq`, `qsv`, `viu`, `superfile`, `fastfetch`, `asciinema`, `bottom`, `htop`, `tmux`, `git-delta`, `lazygit`, `fq`, `fx`, `websocat`, `cloc`, `tree`, `rlwrap`, `parallel`, `tmate`, `trash-cli`, `sysstat`, `inotify-tools`
 
 ### Security / Offensive (pacman)
-`metasploit` (msfconsole, msfvenom), `hashcat`, `bettercap`, `nmap`, `wireshark-qt`, `ghidra`, `gdb+gef`, `gitleaks`, `opensnitch`, `bore` (TCP NAT tunnel — `bore local <PORT> --to bore.pub`)
+`metasploit` (msfconsole, msfvenom), `hashcat`, `bettercap`, `nmap`, `wireshark-qt`, `ghidra`, `gdb+gef`, `opensnitch`, `bore` (TCP NAT tunnel — `bore local <PORT> --to bore.pub`)
 
 ### Security / Offensive (yay/AUR)
 `ffuf`, `gau`, `waybackurls`, `fabric-ai-bin`, `caido-desktop`, `caido-cli`, `gobypass403` (GitHub release), `wpprobe` (GitHub release)
@@ -333,10 +333,13 @@ The qcow2 build installs the committed checkout. Local image login is `hacker` /
 `aix`, `alterx`, `asnmap`, `cdncheck`, `chaos-client`, `cloudlist`, `cvemap`, `dnsx`, `httpx`, `interactsh-client`, `interactsh-server`, `katana`, `mapcidr`, `naabu`, `notify`, `nuclei`, `proxify`, `shuffledns`, `simplehttpserver`, `subfinder`, `tldfinder`, `tlsx`, `tunnelx`, `uncover`, `urlfinder`
 
 ### Python uv Tools
-`sqlmap`, `wafw00f`, `bypass-url-parser`, `exegol`, `semgrep`, `pre-commit`, `argcomplete`, `yt-dlp`, `defaultcreds-cheat-sheet`
+`sqlmap`, `wafw00f`, `bypass-url-parser`, `exegol`, `pre-commit`, `argcomplete`, `yt-dlp`, `defaultcreds-cheat-sheet`
 
 ### Go Tools (mise exec)
 `sns` (sw33tLie), `cook` (glitchedgitz), `brutespray` (x90skysn3k), `gowitness` (sensepost)
+
+### GitHub Binary Releases
+`opengrep` (v2.0.0), `betterleaks` (v1.10.1), `gobypass403`, `wpprobe`
 
 ### Cloned Tools (/opt/)
 | Path | Repo | Purpose |
@@ -459,7 +462,7 @@ pyreq          # pip install -r requirements.txt
 
 ### Secret Scanning
 ```bash
-gitleaks detect --source . --report-format sarif --report-path gitleaks.sarif
+betterleaks git . --redact --report-format sarif --report-path betterleaks.sarif
 dtrufflehog git file://. --only-verified
 ```
 

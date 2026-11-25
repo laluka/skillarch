@@ -20,7 +20,7 @@ Reproducible hacker workstation for CachyOS/Arch. One `make install` sets up dot
 | [config/aliases](config/aliases) | All shell aliases — sourced by [config/zshrc](config/zshrc). |
 | [config/i3/config](config/i3/config) | i3 keybindings (AZERTY workspace keys). |
 | [Dockerfile-lite](Dockerfile-lite) / [Dockerfile-full](Dockerfile-full) | Lite = CLI only. Full = lite + GUI + wordlists. |
-| [.github/workflows/cicd.yml](.github/workflows/cicd.yml) | Builds both Docker images + semgrep/trivy/gitleaks. |
+| [.github/workflows/cicd.yml](.github/workflows/cicd.yml) | Builds both Docker images + Opengrep/Trivy/Betterleaks. |
 
 All dotfiles live in `config/` and are **symlinked** into `$HOME` by the `ska-link` Makefile macro (original is renamed to `*.skabak`).
 

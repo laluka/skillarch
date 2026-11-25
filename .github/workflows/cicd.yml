@@ -1,5 +1,8 @@
 name: Main CICD Workflow
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [ '**' ]
@@ -8,17 +11,13 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || 'thelaluka' }}
-
 jobs:
   docker:
     if: github.repository == 'laluka/SkillArch'
     runs-on: ubuntu-latest
     steps:
       - name: Free Disk Space
-        uses: endersonmenezes/free-disk-space@v2
+        uses: endersonmenezes/free-disk-space@24d3e2af1fe79ccdde8844605337a8835e20d012 # v4
         with:
           remove_android: true
           remove_dotnet: true
@@ -38,24 +37,25 @@ jobs:
           df -h /
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Build and smoke-test lite and full
         run: make docker-build-full
 
       - name: Login to DockerHub
         if: github.ref == 'refs/heads/main'
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
+          username: thelaluka
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Publish tested images
         if: github.ref == 'refs/heads/main'
         run: |
-          image="$DOCKERHUB_USERNAME/skillarch"
+          image="thelaluka/skillarch"
           for variant in lite full; do
-            docker tag "thelaluka/skillarch:$variant" "$image:$variant"
             docker tag "$image:$variant" "$image:$variant-$GITHUB_SHA"
             docker push "$image:$variant-$GITHUB_SHA"
             docker push "$image:$variant"
@@ -63,56 +63,70 @@ jobs:
           docker tag "$image:full" "$image:latest"
           docker push "$image:latest"
 
-  semgrep:
-    name: semgrep
-    runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep
-    steps:
-      - uses: actions/checkout@v6
-      - run: |
-          semgrep ci
-        env:
-          # Generate a token from Semgrep AppSec Platform > Setting
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-
-
-  trivy:
-    if: github.repository == 'laluka/SkillArch'
-    name: trivy
+  opengrep:
+    name: opengrep
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: Run Trivy in fs mode
-        uses: aquasecurity/trivy-action@0.35.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Opengrep
+        run: |
+          curl -fsSL -o opengrep https://github.com/opengrep/opengrep/releases/download/v2.0.0/opengrep_linux_x86
+          echo '37e93f4da5fd04a18c5c1febbdd12f7e98dfccd4d0c9cf2593bcb25eeb462da0  opengrep' | sha256sum -c -
+          chmod +x opengrep
+      - name: Scan with local rules
+        run: ./opengrep ci --config .github/opengrep-rules.yml --no-suppress-errors
+
+
+  trivy-fs:
+    if: github.repository == 'laluka/SkillArch'
+    name: trivy-fs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run Trivy in fs mode
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.76.2'
           scan-type: 'fs'
           scan-ref: '.'
           scanners: 'misconfig,secret'
+
+  trivy-image:
+    if: github.repository == 'laluka/SkillArch' && github.ref == 'refs/heads/main'
+    name: trivy-image
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
       - name: Run Trivy in image mode
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: '${{ env.DOCKERHUB_USERNAME }}/skillarch:latest'
+          version: 'v0.76.2'
+          image-ref: 'thelaluka/skillarch:full-${{ github.sha }}'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
-          scanners: 'secret'
-          timeout: '30m'
+          scanners: 'vuln'
+          timeout: '60m'
           skip-dirs: '/opt/lists,/opt/ghidra,/opt/metasploit,/opt/exploitdb,/home/hacker/.rustup/toolchains,/home/hacker/.local/go,/opt/phpggc,/opt/pypotomux/wordlists,/usr/NX/etc/keys,/usr/NX/share/keys,/home/hacker/.nuclei-templates,/home/hacker/.local/share/mise/installs/go,/home/hacker/.cache/mise,/home/hacker/.fzf,/usr/lib/qt/mkspecs,/usr/lib/qt6/mkspecs,/home/hacker/.cache/uv/archive-v0' # Chunky boys
 
-  gitleaks:
+  betterleaks:
     if: github.repository == 'laluka/SkillArch'
-    name: gitleaks
+    name: betterleaks
     runs-on: ubuntu-latest
     container:
-      image: zricethezav/gitleaks:latest
+      image: ghcr.io/betterleaks/betterleaks:v1.10.1
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Run gitleaks
+          persist-credentials: false
+      - name: Run Betterleaks
         run: |
-          git config --global --add safe.directory /__w/skillarch/skillarch
-          gitleaks detect --source . --redact -v --exit-code=2 --report-format=sarif --report-path=results.sarif --log-level=debug
+          betterleaks git . --redact --exit-code=2 --report-format=sarif --report-path=results.sarif
